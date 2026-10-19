@@ -1,0 +1,34 @@
+MedLearn – Installation (Mac)
+=============================
+
+Was du brauchst
+- Einen Mac (macOS 12 oder neuer)
+- Optional: ein eigenes Claude-Abo (Pro oder Max).
+  Ohne Abo kannst du alle Lernpakete lernen, die dir jemand schickt.
+  Mit Abo kannst du zusätzlich eigene Skripte verarbeiten lassen und den KI-Tutor nutzen (keine weiteren Kosten).
+
+Installation (einmalig, ca. 5 Minuten)
+1. Den Ordner „MedLearn“ entpacken (Doppelklick auf die ZIP-Datei).
+2. Im Ordner auf „MedLearn installieren.command“ doppelklicken.
+   Falls macOS meldet, dass die Datei nicht geöffnet werden kann:
+     → Programm „Terminal“ öffnen, „bash “ eintippen (mit Leerzeichen),
+       die Datei „MedLearn installieren.command“ ins Terminal-Fenster ziehen und Enter drücken.
+3. Den Anweisungen im Fenster folgen. Zuerst wirst du gefragt, ob du ein Claude-Abo hast.
+   Mit Abo meldest du dich einmal bei Claude an (Browser öffnet sich), danach im Terminal „/exit“ eintippen.
+4. Fertig – MedLearn öffnet sich im Browser. Ab jetzt startest du es über das Symbol
+   im Dock oder per Spotlight (⌘ + Leertaste → „MedLearn“).
+
+Wo liegen meine Daten?
+- Im Ordner „MedLearn“ in deinem Benutzerordner (~/MedLearn/data).
+  Den entpackten Download-Ordner kannst du nach der Installation löschen.
+
+Updates
+- In MedLearn unter Einstellungen › App › „Nach Updates suchen“ (falls eingerichtet),
+  oder: neue ZIP entpacken und den Installer erneut starten. Deine Daten bleiben erhalten.
+
+Lernpakete von Freunden
+- Bibliothek › „Lernpaket importieren“ › .medlearn-Datei wählen. Fertig verarbeitete Skripte
+  sind dann sofort lernbar – ohne dass deine KI sie neu verarbeiten muss.
+
+MedLearn beenden
+- Einstellungen › App › „Beenden“ (oder einfach laufen lassen – es braucht kaum Strom).

@@ -1,0 +1,5 @@
+data/
+node_modules/
+runtime/
+*.zip
+.DS_Store

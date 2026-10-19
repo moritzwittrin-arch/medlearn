@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedLearn</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231d5e58'/><path d='M7 11c2.5-1.5 6.5-1.5 9 0 2.5-1.5 6.5-1.5 9 0v12c-2.5-1.5-6.5-1.5-9 0-2.5-1.5-6.5-1.5-9 0zM16 11v12' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script>try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+  <div class="layout">
+    <nav class="side">
+      <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M4 6.5c2.5-1.5 5.5-1.5 8 0 2.5-1.5 5.5-1.5 8 0V18c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0z"/><path d="M12 6.5V18"/></svg></span>MedLearn</div>
+      <a href="#/" data-nav=""><i data-ic="home"></i><span class="lbl">Übersicht</span></a>
+      <a href="#/lernen" data-nav="lernen"><i data-ic="play"></i><span class="lbl">Lernen</span></a>
+      <a href="#/bibliothek" data-nav="bibliothek"><i data-ic="book"></i><span class="lbl">Bibliothek</span></a>
+      <a href="#/fehler" data-nav="fehler"><i data-ic="flag"></i><span class="lbl">Fehler</span></a>
+      <div class="sep"></div>
+      <a href="#/suche" data-nav="suche"><i data-ic="search"></i><span class="lbl">Suche</span><span class="kbd nav-kbd">⌘K</span></a>
+      <a href="#/tutor" data-nav="tutor"><i data-ic="chat"></i><span class="lbl">Tutor</span></a>
+      <div class="spacer"></div>
+      <a href="#" id="focusBtn"><i data-ic="timer"></i><span class="lbl">Fokus-Timer</span></a>
+      <a href="#/einstellungen" data-nav="einstellungen"><i data-ic="settings"></i><span class="lbl">Einstellungen</span></a>
+      <a href="#" id="themeToggle"><i data-ic="theme"></i><span class="lbl">Hell / Dunkel</span></a>
+    </nav>
+    <main id="app"></main>
+  </div>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
