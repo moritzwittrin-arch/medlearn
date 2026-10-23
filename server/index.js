@@ -419,6 +419,14 @@ app.post('/api/subjects/:id/exam', wrap((req) => {
   return { ok: true, exams };
 }));
 
+// ---------- Profil (Name für die Begrüßung, Tagesziel) ----------
+app.get('/api/profile', wrap(() => getSetting('profile', { name: '', goal: 50 })));
+app.post('/api/profile', wrap((req) => {
+  const p = { name: String(req.body?.name || '').trim().slice(0, 40), goal: Math.min(1000, Math.max(5, parseInt(req.body?.goal) || 50)) };
+  setSetting('profile', p);
+  return p;
+}));
+
 // ---------- Einstellungen ----------
 const SETTING_KEYS = ['provider', 'claudePath', 'model', 'fastModel', 'apiKey', 'concurrency'];
 app.get('/api/settings', wrap(() => { const s = aiSettings(); return { ...s, apiKey: s.apiKey ? '••••' + s.apiKey.slice(-4) : '' }; }));

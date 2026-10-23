@@ -29,6 +29,7 @@ const ICONS = {
   timer: '<circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.2 1.6M10 3.5h4M18.5 6.5l1.2-1.2"/>',
   calendar: '<rect x="4" y="5.5" width="16" height="14" rx="1.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
   share: '<path d="M12 15V4.5M8 8l4-4 4 4"/><path d="M6 11.5H5a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6.5a1 1 0 0 0-1-1h-1"/>',
+  flame: '<path d="M12 21c-3.6 0-6-2.4-6-5.6 0-3.1 2.2-4.9 3.4-7.3.5 1.7 1.4 2.7 2.4 3.2-.1-3 1.2-5.9 3.7-7.8-.3 2.6.7 4.7 1.9 6.5 1 1.5 1.6 3 1.6 4.9 0 3.6-2.6 6.1-7 6.1z"/>',
   folder: '<path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4.2l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17z"/>',
   folderPlus: '<path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4.2l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17z"/><path d="M12 10.5v5M9.5 13h5"/>',
   move: '<path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4.2l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17z"/><path d="M9 13h6M12.5 10.5 15 13l-2.5 2.5"/>',
@@ -150,13 +151,82 @@ document.getElementById('themeToggle').addEventListener('click', (e) => {
   try { localStorage.setItem('theme', next); } catch {}
 });
 
+// Kleine Konfetti-Belohnung am Ende einer guten Session (respektiert „Bewegung reduzieren“)
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas'); c.className = 'confetti';
+  c.width = innerWidth * devicePixelRatio; c.height = innerHeight * devicePixelRatio;
+  document.body.appendChild(c);
+  const x = c.getContext('2d'); x.scale(devicePixelRatio, devicePixelRatio);
+  const cols = [...SUBJ_COLORS, '#f2b632'];
+  const P = Array.from({ length: 140 }, () => ({
+    x: innerWidth / 2 + (Math.random() - .5) * 160, y: innerHeight * .38, vx: (Math.random() - .5) * 13, vy: -Math.random() * 13 - 5,
+    w: 5 + Math.random() * 6, h: 8 + Math.random() * 8, r: Math.random() * 6, vr: (Math.random() - .5) * .35, c: cols[(Math.random() * cols.length) | 0],
+  }));
+  const t0 = performance.now();
+  (function frame(t) {
+    x.clearRect(0, 0, innerWidth, innerHeight);
+    for (const p of P) {
+      p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); x.restore();
+    }
+    if (t - t0 < 2600) requestAnimationFrame(frame); else c.remove();
+  })(t0);
+}
+
+// ---------- Tageskarte (Begrüßung, Tagesziel, Serie) ----------
+function streakDays(activity = []) {
+  const days = new Set(activity.filter((a) => a.n > 0).map((a) => a.d));
+  const key = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  if (!days.has(key(d))) d.setDate(d.getDate() - 1);   // heute noch nichts gelernt → Serie von gestern zählt noch
+  let n = 0;
+  while (days.has(key(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function heroCard(d) {
+  const h = new Date().getHours();
+  const hello = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Hallo' : 'Guten Abend';
+  const name = d.profile?.name ? `, ${esc(d.profile.name)}` : '';
+  const goal = Math.max(5, Number(d.profile?.goal) || 50);
+  const done = d.today.reviews || 0;
+  const pct = Math.min(1, done / goal);
+  const streak = streakDays(d.activity);
+  const due = d.due.cards + d.due.mc + d.due.match;
+  const fresh = d.fresh.cards + d.fresh.mc + d.fresh.match;
+  const R = 46, C = 2 * Math.PI * R;
+  const msg = !d.subjects.length ? 'Lade ein Skript hoch, dann geht es los.'
+    : done >= goal ? `Tagesziel geschafft – ${done} Antworten${d.today.reviews ? `, ${Math.round(100 * d.today.correct / d.today.reviews)} % richtig` : ''}.`
+      : done ? `Noch ${goal - done} Antworten bis zu deinem Tagesziel.` : due ? `${due} Wiederholungen warten auf dich.` : 'Starte mit ein paar neuen Inhalten.';
+  return `<section class="hero">
+    <svg class="hero-ecg" viewBox="0 0 1200 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 120 H330 l18 -8 l14 8 h40 l12 -70 l16 120 l14 -78 l10 28 h70 l22 -14 l20 14 H760 l18 -8 l14 8 h40 l12 -70 l16 120 l14 -78 l10 28 h70 l22 -14 l20 14 H1200"/></svg>
+    <div class="hero-main">
+      <div class="hero-date">${new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+      <h1>${hello}${name}</h1>
+      <p class="hero-msg">${msg}</p>
+      <div class="hero-chips">
+        <span class="chip ${streak ? 'fire' : ''}" title="Tage in Folge mit mindestens einer Antwort">${icon('flame', 's')} ${streak ? `${streak} ${streak === 1 ? 'Tag' : 'Tage'} in Folge` : 'Serie starten'}</span>
+        <span class="chip">${due} fällig</span><span class="chip">${fresh} neu</span>
+        ${d.openMistakes ? `<a class="chip" href="#/fehler">${d.openMistakes} offene Fehler</a>` : ''}
+      </div>
+      ${d.subjects.length ? `<a class="btn big hero-cta" href="#/lernen">${icon('play')} Jetzt lernen</a>` : `<a class="btn big hero-cta" href="#/bibliothek">${icon('upload')} Skript hochladen</a>`}
+    </div>
+    <div class="hero-goal" title="Tagesziel: ${goal} Antworten (änderbar in den Einstellungen)">
+      <svg viewBox="0 0 110 110"><circle cx="55" cy="55" r="${R}" class="g-track"/>
+        <circle cx="55" cy="55" r="${R}" class="g-fill" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" transform="rotate(-90 55 55)"/></svg>
+      <div class="g-num">${done}<small>von ${goal}</small></div>
+      <div class="g-lbl">${done >= goal ? 'Ziel erreicht' : 'Tagesziel'}</div>
+    </div>
+  </section>`;
+}
+
 // ---------- Dashboard ----------
 async function viewDashboard(soft = false) {
   const [d, saved] = await Promise.all([api('/dashboard'), api('/saved-sessions').catch(() => [])]);
   const totalNew = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const hasContent = d.subjects.length > 0;
   setView(`
-  <div class="row between"><h1>Heute</h1><span class="muted">${new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+  ${heroCard(d)}
   ${d.processing.map((p) => `
     <div class="card" style="margin-bottom:16px">
       <div class="row between"><b class="row" style="gap:8px">${icon('file')} ${esc(p.title)}</b>
@@ -171,18 +241,6 @@ async function viewDashboard(soft = false) {
         Oder importiere ein Lernpaket, das dir jemand geschickt hat.</p>
       <a class="btn primary" href="#/bibliothek">Zur Bibliothek</a>
     </div>` : `
-  <div class="card today" style="margin-bottom:16px">
-    <div>
-      <div class="figs">
-        <div class="fig due"><div class="n">${d.due.cards + d.due.mc + d.due.match}</div><div class="t">zur Wiederholung fällig</div></div>
-        <div class="fig"><div class="n">${totalNew}</div><div class="t">neue Lerninhalte</div></div>
-        <div class="fig"><div class="n">${d.openMistakes}</div><div class="t">offene Fehler</div></div>
-      </div>
-      <div class="sub">${d.today.reviews ? `Heute ${d.today.reviews} Antworten, davon ${Math.round(100 * d.today.correct / d.today.reviews)} % richtig.` : 'Heute noch nichts gelernt.'}
-        Fällig: ${d.due.cards} Karten, ${d.due.mc + d.due.match} Fragen.</div>
-    </div>
-    <a class="btn primary big" href="#/lernen">${icon('play')} Jetzt lernen</a>
-  </div>
   ${saved.length ? `<div class="card" style="margin-bottom:16px"><h3>Weitermachen</h3>
     <ul class="list">${saved.slice(0, 3).map((x) => `<li class="row between"><span>${esc(x.label || 'Session')}
       <span class="muted small" style="margin-left:6px">${x.done} von ${x.total} beantwortet</span></span>
@@ -488,7 +546,7 @@ function libTreeHtml(lib, folders = []) {
 
   // Fach-Block außerhalb von Ordnern (wie bisher)
   const subjectHtml = (s, docs) => `
-    <details class="tree" data-k="s${s.id}" ${isOpen(`s${s.id}`, true) ? 'open' : ''}>
+    <details class="tree subj" style="--sc:${subjColor(s.name)}" data-k="s${s.id}" ${isOpen(`s${s.id}`, true) ? 'open' : ''}>
       <summary><span class="row"><span class="chev"></span>${ring({ ...sumStats(docs), name: s.name }, 40)}<b style="font-size:1.05rem">${esc(s.name)}</b></span>
         <span class="row" style="gap:12px">${examTag(s)}
           <button class="small ghost" data-share="subject:${s.id}" data-share-name="${esc(s.name)}" title="Ganzes Fach als Lernpaket teilen">${icon('share', 's')}</button>
@@ -502,7 +560,7 @@ function libTreeHtml(lib, folders = []) {
 
   // Fach-Gruppe innerhalb eines Ordners
   const subjectInFolder = (f, s, docs) => `
-    <details class="sub fsub" data-k="f${f.id}s${s.id}" ${isOpen(`f${f.id}s${s.id}`, true) ? 'open' : ''}>
+    <details class="sub fsub" style="--sc:${subjColor(s.name)}" data-k="f${f.id}s${s.id}" ${isOpen(`f${f.id}s${s.id}`, true) ? 'open' : ''}>
       <summary><span class="row"><span class="chev"></span>${ring({ ...sumStats(docs), name: s.name }, 28, false)}<b>${esc(s.name)}</b><span class="muted small">${docs.length} Skript${docs.length === 1 ? '' : 'e'}</span>${examTag(s)}</span></summary>
       ${examForm(s.id, s.exam)}
       ${docs.map((d) => docHtml(d, docs.length >= 3)).join('')}
@@ -761,7 +819,7 @@ async function viewLearn(params) {
     };
   }
   function renderSuspended(item) {
-    stage().innerHTML = `<div class="qcard">${head(item)}<div class="qtext muted">${esc(item.data.q || item.data.stem || item.data.title || item.data.text || '')}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext muted">${esc(item.data.q || item.data.stem || item.data.title || item.data.text || '')}</div>
       <div class="done-note">Ausgeblendet – wird nicht mehr abgefragt.</div>
       <div class="row" style="margin-top:12px"><button id="unsus">Wieder einblenden</button></div></div>`;
     document.getElementById('unsus').onclick = async () => {
@@ -783,7 +841,7 @@ async function viewLearn(params) {
   }
   const doneNote = (d) => `<div class="done-note ${d.correct ? 'good' : 'bad'}">${icon(d.correct ? 'check' : 'x', 's')} Beantwortet – Bewertung: <b>${RATE_LBL[d.rating - 1]}</b>
     <span class="muted small">(zählt für die Wiederholung; zum Ändern die Frage später erneut lernen)</span></div>`;
-  const head = (item) => `<div class="kind">${item.data.fig ? 'Bildkarte' : KIND_LABEL[item.kind]} ${item.isNew ? '<span class="tag accent">neu</span>' : ''}
+  const head = (item) => `<div class="kind"><span class="subj-pill">${esc(item.source.subject)}</span>${item.data.fig ? 'Bildkarte' : KIND_LABEL[item.kind]} ${item.isNew ? '<span class="tag accent">neu</span>' : ''}
     ${item.lapses || item.wrong ? `<span class="tag bad">${item.wrong || item.lapses}× falsch</span>` : ''}
     ${item.data.type === 'klinisch' ? '<span class="tag">klinisch</span>' : ''}</div>`;
   const kiBox = (t) => (t ? `<div class="ai-box">${KI_LABEL} <span class="muted small">– nicht aus deinem Skript</span><div style="margin-top:4px">${esc(t)}</div></div>` : '');
@@ -837,7 +895,7 @@ async function viewLearn(params) {
   }
 
   function renderFlash(item, d) {
-    stage().innerHTML = `<div class="qcard">${head(item)}${item.data.fig ? figFront(item.data.fig) : ''}<div class="qtext">${esc(item.data.q)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}${item.data.fig ? figFront(item.data.fig) : ''}<div class="qtext">${esc(item.data.q)}</div>
       <div id="ans"></div>
       <div id="act" style="margin-top:20px"><button class="primary" id="show">Antwort zeigen <span class="kbd">Leertaste</span></button></div>
       ${sourceRow(item)}</div>`;
@@ -859,7 +917,7 @@ async function viewLearn(params) {
     const parts = item.data.text.split(/(\{\{.+?\}\})/);
     const show = (open) => parts.map((p) => /^\{\{.+\}\}$/.test(p)
       ? (open ? `<span class="cloze-gap">${esc(p.slice(2, -2))}</span>` : '<span class="cloze-hidden">…</span>') : esc(p)).join('');
-    stage().innerHTML = `<div class="qcard">${head(item)}<div class="qtext" id="cl">${show(false)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext" id="cl">${show(false)}</div>
       <div id="act" style="margin-top:20px"><button class="primary" id="show">Lösung zeigen <span class="kbd">Leertaste</span></button></div>
       ${sourceRow(item)}</div>`;
     bindCommon(item);
@@ -880,7 +938,7 @@ async function viewLearn(params) {
   function renderMc(item, d, p) {
     const q = item.data;
     const letters = 'ABCDEFG';
-    stage().innerHTML = `<div class="qcard">${head(item)}<div class="qtext">${esc(q.stem)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext">${esc(q.stem)}</div>
       <div class="options">${q.options.map((o, k) => `<button class="option" data-opt="${k}"><span class="key">${letters[k]}</span><span class="option-body">${esc(o)}<span class="why"></span></span></button>`).join('')}</div>
       <div id="res"></div>${sourceRow(item)}</div>`;
     bindCommon(item);
@@ -933,7 +991,7 @@ async function viewLearn(params) {
   function renderCase(item, d, p) {
     const q = item.data;
     const prevUa = d?.v?.ua ?? p?.ua ?? '';
-    stage().innerHTML = `<div class="qcard">${head(item)}<div class="qtext" style="font-size:1.05rem;font-weight:400">${esc(q.vignette)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext" style="font-size:1.05rem;font-weight:400">${esc(q.vignette)}</div>
       <div class="qtext" style="margin-top:14px">${esc(q.q)}</div>
       <div style="margin-top:14px"><textarea id="ua" placeholder="Deine Antwort (optional) …" style="min-height:80px">${esc(prevUa)}</textarea></div>
       <div id="act" style="margin-top:14px"><button class="primary" id="show">Lösung zeigen</button></div>${sourceRow(item)}</div>`;
@@ -966,7 +1024,7 @@ async function viewLearn(params) {
     let checked = !!d || !!st.checked;
     let selected = null; // angetippter Begriff (Alternative zu Drag & Drop)
 
-    stage().innerHTML = `<div class="qcard">${head(item)}<div class="qtext">${esc(q.title)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext">${esc(q.title)}</div>
       <div class="muted small" id="mhint" style="margin-top:4px">Ziehe jeden Begriff auf das passende Feld – oder tippe erst den Begriff, dann das Feld an.</div>
       <div class="match">
         <div class="match-rows" id="mrows"></div>
@@ -1075,6 +1133,8 @@ async function viewLearn(params) {
     }
     // Abschluss: gespeicherte Session löschen
     S.finished = true;
+    { const r = S.items.filter((it) => S.done[it.id] && !S.done[it.id].suspended); const okN = r.filter((it) => S.done[it.id].correct).length;
+      if (r.length >= 5 && okN / r.length >= 0.6) setTimeout(confetti, 150); }
     saveChain.then(discard);
     const res = S.items.filter((it) => S.done[it.id] && !S.done[it.id].suspended).map((it) => ({ item: it, ...S.done[it.id] }));
     const n = res.length, ok = res.filter((r) => r.correct).length;
@@ -1193,7 +1253,16 @@ async function viewMistakes() {
 // ---------- Einstellungen ----------
 async function viewSettings() {
   const s = await api('/settings');
+  const prof = await api('/profile').catch(() => ({ name: '', goal: 50 }));
   setView(`<h1>Einstellungen</h1>
+  <div class="card stack" style="margin-bottom:16px">
+    <h2>Du</h2>
+    <form id="profForm" class="grid" style="grid-template-columns:1fr 160px auto;align-items:end">
+      <div><label>Vorname (für die Begrüßung)</label><input name="name" value="${esc(prof.name)}" placeholder="optional" maxlength="40"></div>
+      <div><label>Tagesziel (Antworten)</label><input name="goal" type="number" min="5" max="1000" step="5" value="${prof.goal}"></div>
+      <button class="primary">Speichern</button>
+    </form>
+  </div>
   <div class="card stack">
     <div><label>KI-Anbindung</label>
       <select id="provider">
@@ -1232,6 +1301,11 @@ async function viewSettings() {
       : '<div class="muted">Noch keine Sicherung.</div>');
   };
   loadBackups();
+  document.getElementById('profForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/profile', { method: 'POST', body: { name: e.target.name.value, goal: e.target.goal.value } }); toast('Gespeichert'); }
+    catch (err) { toast(err.message); }
+  };
   api('/version').then((v) => { document.getElementById('ver').textContent = `Version ${v.version}`; }).catch(() => {});
   document.getElementById('upd').onclick = async (e) => {
     const out = document.getElementById('updres'); e.target.disabled = true; out.innerHTML = '<span class="spinner"></span> Suche …';
@@ -1369,6 +1443,13 @@ function ankiDialog(scope, name) {
 }
 
 // ---------- Prüfungs-Countdown ----------
+// Jedes Fach bekommt eine feste Farbe (wie die Register in einem Atlas) – abgeleitet aus dem Namen
+const SUBJ_COLORS = ['#14958a', '#5b6ee1', '#d9537a', '#d38a1f', '#2f95d6', '#9061d6', '#6f9a2e', '#e0674a'];
+function subjColor(name = '') {
+  let h = 0; for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return SUBJ_COLORS[h % SUBJ_COLORS.length];
+}
+
 // Hover-Übersicht für alle Ringe (ein schwebendes Element, damit nichts abgeschnitten wird)
 (() => {
   let tipEl = null;
@@ -1418,7 +1499,7 @@ function progressCard(d, saved = []) {
   const tile = (x, scope) => {
     const open = Math.max(0, x.total - (x.known || 0) - (x.wrong || 0));
     const run = saved.find((v) => v.key === `${scope}:mixed` && v.done > 0);
-    return `<div class="ring-tile">
+    return `<div class="ring-tile" style="--sc:${scope.startsWith('folder') ? 'var(--accent)' : subjColor(x.name)}">
       <a href="#/lernen?scope=${scope}" class="ring-link">${ring(x, 76)}</a>
       <div class="ring-body">
         <a href="#/lernen?scope=${scope}" class="ring-name">${scope.startsWith('folder') ? icon('folder', 's fold-ic') : ''}${esc(x.name)}</a>

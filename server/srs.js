@@ -186,6 +186,7 @@ export function dashboard() {
     today: { reviews: todayStats.n || 0, correct: todayStats.ok || 0, items: todayStats.items || 0 },
     subjects: subjects.map((s) => ({ ...s, pct: s.total ? Math.round(100 * (s.known || 0) / s.total) : 0 })),
     folders,
+    profile: getSetting('profile', { name: '', goal: 50 }),
     weak, recent, processing, activity, exams,
     openMistakes: one('SELECT COUNT(*) n FROM mistakes WHERE resolved=0').n,
   };
