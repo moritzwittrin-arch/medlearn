@@ -9,6 +9,7 @@ import { q, one, run, tx, PDF_DIR, getSetting, setSetting, ITEM_OK, createBackup
 import { processDocument, isRunning, generateForTopic, upgradeMatches, upgradeFigures } from './pipeline.js';
 import { FIG_DIR, applyFiguresToTopic } from './figures.js';
 import { exportPackage, importPackage } from './package.js';
+import { findWeakSpots, createDrill, getDrill } from './weak.js';
 import { checkUpdate, applyUpdate, restartServer, currentVersion } from './update.js';
 import { review, buildSession, dashboard, hydrate, previewIntervals } from './srs.js';
 import { completeJson, complete, testConnection, aiSettings } from './ai.js';
@@ -418,6 +419,11 @@ app.post('/api/subjects/:id/exam', wrap((req) => {
   setSetting('exams', exams);
   return { ok: true, exams };
 }));
+
+// ---------- Schwachstellen & Mini-Training ----------
+app.get('/api/weak', wrap((req) => findWeakSpots({ limit: Number(req.query.limit) || 5 })));
+app.post('/api/weak/drill', wrap(async (req) => createDrill(req.body?.topicId, req.body?.unitIds)));
+app.get('/api/drills/:id', wrap((req) => getDrill(req.params.id) || (() => { throw fail('Nicht gefunden', 404); })()));
 
 // ---------- Profil (Name für die Begrüßung, Tagesziel) ----------
 app.get('/api/profile', wrap(() => getSetting('profile', { name: '', goal: 50 })));

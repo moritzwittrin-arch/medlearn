@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -21,6 +21,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Neues Design: Tageskarte mit Tagesziel und Lernserie, Fächerfarben, Konfetti"
+    "notes": "Gezielt üben: Die App erkennt Unterpunkte, die du wiederholt falsch beantwortest, und erstellt dazu ein Mini-Training"
   }
 }

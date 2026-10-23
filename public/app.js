@@ -174,6 +174,35 @@ function confetti() {
   })(t0);
 }
 
+// ---------- Schwachstellen: gezieltes Mini-Training ----------
+function weakCard(list = []) {
+  if (!list.length) return '';
+  return `<div class="card weak-card" style="margin-bottom:16px">
+    <div class="row between"><h3 style="margin:0">Gezielt üben</h3><span class="muted small">Unterpunkte, die du zuletzt mehrfach falsch hattest</span></div>
+    <ul class="weak-list">${list.map((w, k) => `
+      <li style="--sc:${subjColor(w.subject)}">
+        <div class="weak-body">
+          <div class="weak-title">${esc(w.drill?.title || w.topic)}</div>
+          <div class="muted small">${esc(w.subject)} › ${esc(w.topic)} · ${w.wrong}× falsch${w.topicAccuracy != null && w.topicAccuracy >= 50 ? ` – im übrigen Thema ${w.topicAccuracy} % sicher` : ''}</div>
+          ${w.drill?.summary ? `<div class="weak-sum">${esc(w.drill.summary)}</div>`
+            : `<ul class="weak-units">${w.units.slice(0, 3).map((u) => `<li>${esc(u.content.length > 140 ? u.content.slice(0, 140) + ' …' : u.content)}</li>`).join('')}</ul>`}
+        </div>
+        <button class="${k === 0 ? 'primary' : ''}" data-weak="${k}">${w.drill ? `${icon('play', 's')} Mini-Training (${w.drill.items})` : `${icon('play', 's')} Mini-Training erstellen`}</button>
+      </li>`).join('')}</ul></div>`;
+}
+let weakCache = [];
+function bindWeak() {
+  $app.querySelectorAll('[data-weak]').forEach((b) => b.onclick = async () => {
+    const w = weakCache[Number(b.dataset.weak)]; if (!w) return;
+    if (w.drill) { location.hash = `#/lernen?scope=drill:${w.drill.id}`; return; }
+    b.disabled = true; b.innerHTML = '<span class="spinner"></span> Wird erstellt … (ca. 30 s)';
+    try {
+      const r = await api('/weak/drill', { method: 'POST', body: { topicId: w.topicId, unitIds: w.unitIds } });
+      location.hash = `#/lernen?scope=drill:${r.id}`;
+    } catch (err) { toast(err.message); b.disabled = false; b.innerHTML = `${icon('play', 's')} Mini-Training erstellen`; }
+  });
+}
+
 // ---------- Tageskarte (Begrüßung, Tagesziel, Serie) ----------
 function streakDays(activity = []) {
   const days = new Set(activity.filter((a) => a.n > 0).map((a) => a.d));
@@ -222,7 +251,7 @@ function heroCard(d) {
 
 // ---------- Dashboard ----------
 async function viewDashboard(soft = false) {
-  const [d, saved] = await Promise.all([api('/dashboard'), api('/saved-sessions').catch(() => [])]);
+  const [d, saved, weak] = await Promise.all([api('/dashboard'), api('/saved-sessions').catch(() => []), api('/weak?limit=4').catch(() => [])]);
   const totalNew = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const hasContent = d.subjects.length > 0;
   setView(`
@@ -247,6 +276,7 @@ async function viewDashboard(soft = false) {
       <a class="btn small" href="${sessionHref(x.key)}">Fortsetzen</a></li>`).join('')}</ul>
     ${saved.length > 3 ? `<div class="muted small" style="margin-top:6px">und ${saved.length - 3} weitere angefangene Sessions</div>` : ''}</div>` : ''}
 
+  ${weakCard((weakCache = weak))}
   ${progressCard(d, saved)}
   <div class="grid cols-2" style="margin-bottom:16px">
     ${examCard(d)}
@@ -267,6 +297,7 @@ async function viewDashboard(soft = false) {
       </div>
   </div>`}`, soft);
   $app.querySelectorAll('[data-resume]').forEach((b) => b.onclick = async () => { await api(`/documents/${b.dataset.resume}/resume`, { method: 'POST' }); route(); });
+  bindWeak();
   bindExamForms();
   if (d.processing.some((p) => p.status !== 'fehler')) {
     let t = null;
@@ -667,7 +698,7 @@ async function showSource(itemId) {
 // ---------- Lernen ----------
 // Eine Session bleibt (serverseitig gespeichert) erhalten, bis sie abgeschlossen wird –
 // auch beim Wechsel in andere Bereiche oder nach einem Neustart der App.
-const SCOPE_LABEL = { folder: 'Ordner', subject: 'Fach', document: 'Skript', chapter: 'Kapitel', topic: 'Thema' };
+const SCOPE_LABEL = { drill: 'Mini-Training', folder: 'Ordner', subject: 'Fach', document: 'Skript', chapter: 'Kapitel', topic: 'Thema' };
 const MODE_LABEL = { mixed: 'Gemischt', flashcards: 'Karteikarten', mc: 'MC-Fragen', match: 'Zuordnung', mistakes: 'Fehler wiederholen' };
 const sessionKey = (type, id, mode) => `${type}:${type === 'all' ? '' : id}:${mode}`;
 function sessionHref(key) {
@@ -694,8 +725,10 @@ async function viewLearn(params) {
       return;
     }
     const src = items[0].source;
-    const name = { folder: src.folder, subject: src.subject, document: src.doc, chapter: src.chapter, topic: src.topic }[type];
-    S = { items, i: 0, done: {}, pending: {}, full: type === 'subject' || type === 'folder', label: `${(type === 'subject' || type === 'folder') && mode === 'mixed' ? 'Gesamtabfrage' : MODE_LABEL[mode]}${type !== 'all' ? `, ${SCOPE_LABEL[type]}: ${name}` : ''}` };
+    const drill = type === 'drill' ? await api(`/drills/${id}`).catch(() => null) : null;
+    const name = { folder: src.folder, subject: src.subject, document: src.doc, chapter: src.chapter, topic: src.topic, drill: drill?.title || src.topic }[type];
+    S = { items, i: 0, done: {}, pending: {}, full: type === 'subject' || type === 'folder', label: type === 'drill' ? `Mini-Training: ${name}` : `${(type === 'subject' || type === 'folder') && mode === 'mixed' ? 'Gesamtabfrage' : MODE_LABEL[mode]}${type !== 'all' ? `, ${SCOPE_LABEL[type]}: ${name}` : ''}`,
+      ...(drill?.summary ? { brief: drill.summary } : {}) };
   }
   S.done = S.done || {}; S.pending = S.pending || {};
   const N = S.items.length;
@@ -703,7 +736,7 @@ async function viewLearn(params) {
   // Speichern (Reihenfolge der Schreibvorgänge bleibt erhalten)
   let saveChain = Promise.resolve();
   const save = () => {
-    const data = { items: S.items, i: S.i, done: S.done, pending: S.pending, label: S.label, full: S.full };
+    const data = { items: S.items, i: S.i, done: S.done, pending: S.pending, label: S.label, full: S.full, brief: S.brief };
     saveChain = saveChain.then(() => api('/saved-session', { method: 'PUT', body: { key, label: S.label, data } })).catch(() => {});
   };
   const discard = () => api(`/saved-session?key=${encodeURIComponent(key)}`, { method: 'DELETE' }).catch(() => {});
@@ -715,6 +748,7 @@ async function viewLearn(params) {
     <div class="row between" style="margin:-8px 0 10px">
       <span class="muted small">${esc(S.label)}</span>
       <button class="small ghost" id="restart" title="Diese Session verwerfen und neu zusammenstellen">${icon('rotate', 's')} Neu starten</button></div>
+    ${S.brief ? `<div class="drill-brief">${icon('flag', 's')}<div><b>Darum geht es</b><div>${esc(S.brief)}</div></div></div>` : ''}
     <div class="dots" id="dots"></div>
     <div id="stage"></div>
     <div class="learn-nav" id="nav">

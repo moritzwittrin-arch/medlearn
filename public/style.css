@@ -432,3 +432,19 @@ details.fsub { border-left-color: var(--sc) !important; border-left-width: 3px !
 .today { display: none; }
 .empty h2 { font-size: 1.4rem; }
 @media (prefers-reduced-motion: reduce) { .hero-ecg path { animation: none; stroke-dashoffset: 0; } }
+
+/* ===== Gezielt üben (Schwachstellen) ===== */
+.weak-card { border-color: color-mix(in srgb, var(--mark) 45%, var(--border)); background: linear-gradient(180deg, var(--mark-soft) 0%, var(--panel) 70%); }
+.weak-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.weak-list > li { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: var(--radius-s);
+  background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--sc); }
+.weak-body { min-width: 0; }
+.weak-title { font: 650 1rem/1.3 var(--display); margin-bottom: 2px; }
+.weak-sum { font-size: .9rem; margin-top: 6px; max-width: 70ch; }
+.weak-units { margin: 6px 0 0; padding-left: 18px; font-size: .86rem; color: var(--muted); }
+.weak-units li { margin: 2px 0; }
+.weak-list button { flex: none; }
+@media (max-width: 640px) { .weak-list > li { flex-direction: column; align-items: stretch; } }
+.drill-brief { display: flex; gap: 10px; align-items: flex-start; background: var(--mark-soft); border: 1px solid color-mix(in srgb, var(--mark) 45%, var(--border));
+  border-radius: var(--radius-s); padding: 12px 14px; margin-bottom: 14px; font-size: .92rem; }
+.drill-brief .ic { color: var(--warn); margin-top: 3px; }

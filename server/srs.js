@@ -63,6 +63,7 @@ export function scopeSql(scope) {
   const id = parseInt(scope.id);
   switch (scope.type) {
     case 'subject': return { sql: 'i.doc_id IN (SELECT id FROM documents WHERE subject_id=?)', params: [id] };
+    case 'drill': return { sql: "i.id IN (SELECT value FROM json_each((SELECT item_ids FROM weak_drills WHERE id=?)))", params: [id] };
     case 'folder': return { sql: 'i.doc_id IN (SELECT id FROM documents WHERE folder_id=?)', params: [id] };
     case 'document': return { sql: 'i.doc_id=?', params: [id] };
     case 'chapter': return { sql: 'i.topic_id IN (SELECT id FROM topics WHERE chapter_id=?)', params: [id] };
@@ -98,7 +99,7 @@ export function buildSession({ scope, mode = 'mixed', size } = {}) {
   const kindFilter = (kinds) => `i.kind IN (${kinds.map((k) => `'${k}'`).join(',')})`;
 
   // Ganzes Fach / ganzer Ordner: eine große Abfrage mit ALLEN Lerninhalten, durchgemischt (wie bei Medibk+)
-  const full = ['subject', 'folder'].includes(scope?.type);
+  const full = ['subject', 'folder', 'drill'].includes(scope?.type);
 
   if (mode === 'mistakes') {
     const rows = q(`${ITEM_SELECT} WHERE ${sql} AND ${ITEM_OK} AND i.id IN (SELECT item_id FROM mistakes WHERE resolved=0)
