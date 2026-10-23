@@ -2,7 +2,7 @@
 // Daten (data/) und installierte Pakete (node_modules/) bleiben unangetastet.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn, execFile } from 'node:child_process';
+import { spawn, execFile, exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { unzip } from './package.js';
 
@@ -67,16 +67,22 @@ export async function applyUpdate() {
 }
 
 function npmInstall() {
-  const npm = path.join(path.dirname(process.execPath), process.platform === 'win32' ? 'npm.cmd' : 'npm');
+  const isWin = process.platform === 'win32';
+  const npmPath = path.join(path.dirname(process.execPath), isWin ? 'npm.cmd' : 'npm');
+  const npm = fs.existsSync(npmPath) ? npmPath : 'npm';
   const env = { ...process.env, PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH || ''}` };
-  return new Promise((resolve, reject) => execFile(fs.existsSync(npm) ? npm : 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund'],
-    { cwd: APP_DIR, env, shell: process.platform === 'win32', timeout: 600000 }, (e, so, se) => (e ? reject(new Error(`npm install fehlgeschlagen: ${se || e.message}`)) : resolve())));
+  const args = ['install', '--omit=dev', '--no-audit', '--no-fund'];
+  const done = (resolve, reject) => (e, so, se) => (e ? reject(new Error(`npm install fehlgeschlagen: ${se || e.message}`)) : resolve());
+  return new Promise((resolve, reject) => (isWin
+    // .cmd-Dateien brauchen unter Windows die Shell; Pfad in Anführungszeichen (Benutzernamen mit Leerzeichen)
+    ? exec(`"${npm}" ${args.join(' ')}`, { cwd: APP_DIR, env, timeout: 600000, windowsHide: true }, done(resolve, reject))
+    : execFile(npm, args, { cwd: APP_DIR, env, timeout: 600000 }, done(resolve, reject))));
 }
 
 // Server neu starten: neuen Prozess losgelöst starten, alten beenden (der neue wartet, bis der Port frei ist)
 export function restartServer() {
   const child = spawn(process.execPath, process.execArgv.concat(process.argv.slice(1)), {
-    cwd: process.cwd(), detached: true, stdio: 'ignore', env: { ...process.env, MEDLEARN_NO_OPEN: '1' },
+    cwd: process.cwd(), detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, MEDLEARN_NO_OPEN: '1' },
   });
   child.unref();
   setTimeout(() => process.exit(0), 300);

@@ -66,7 +66,8 @@ Dauer: ca. 1–2 Minuten pro 5 Seiten. Die Verarbeitung läuft im Hintergrund; d
 
 ## MedLearn an Freunde weitergeben
 
-- **Installer (Mac):** `MedLearn installieren.command` kopiert die App nach `~/MedLearn`, installiert bei Bedarf Node.js (lokal, ohne Admin) und Claude Code, führt durch die Claude-Anmeldung, legt das Programmsymbol `~/Applications/MedLearn.app` an und fragt, ob es ins Dock soll. Erneut ausführen = Update; Daten in `data/` bleiben unberührt.
+- **Installer (Windows):** `MedLearn installieren (Windows).cmd` startet `install/install-windows.ps1`: kopiert nach `%USERPROFILE%\MedLearn`, Node.js lokal (ohne Admin), Claude Code (`install.ps1`), Claude-Anmeldung, Verknüpfungen auf Desktop und im Startmenü (`install/start.vbs` startet den Server unsichtbar, Log in `data/server.log`).
+- **Installer (Mac):** `MedLearn installieren (Mac).command` kopiert die App nach `~/MedLearn`, installiert bei Bedarf Node.js (lokal, ohne Admin) und Claude Code, führt durch die Claude-Anmeldung, legt das Programmsymbol `~/Applications/MedLearn.app` an und fragt, ob es ins Dock soll. Erneut ausführen = Update; Daten in `data/` bleiben unberührt.
 - **Weitergeben:** ZIP des Ordners **ohne** `data/` und `node_modules/` verschicken (dein Lernstand und deine Skripte bleiben bei dir). Anleitung für Freunde: `LIES MICH – Installation.txt`.
 - **Jeder nutzt sein eigenes Claude-Abo** – ein gemeinsamer Server mit Abo-Login ist laut Anthropic nicht erlaubt.
 - **Lernpakete (.medlearn):** Bibliothek › Teilen-Symbol bei Skript, Fach oder Ordner. Enthält Struktur, Lerninhalte, Abbildungen, Seitentexte und optional die PDF – keinen Lernfortschritt. Import über „Lernpaket importieren“.

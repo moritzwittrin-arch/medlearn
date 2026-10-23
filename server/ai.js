@@ -88,8 +88,10 @@ function runClaudeCli(prompt, { model, web = false, images = null, system = SYST
   const isWin = process.platform === 'win32';
   const claudeBin = resolveClaude(s.claudePath);
   return new Promise((resolve, reject) => {
-    const child = spawn(isWin ? [claudeBin, ...args].map(winQuote).join(' ') : claudeBin,
-      isWin ? [] : args, { cwd: tmp, env, shell: isWin, windowsHide: true });
+    // Windows: claude.exe direkt starten (kein Shell-Quoting nötig, Pfade mit Leerzeichen ok); nur .cmd/Befehlsnamen über die Shell
+    const viaShell = isWin && !/\.exe$/i.test(claudeBin);
+    const child = spawn(viaShell ? [claudeBin, ...args].map(winQuote).join(' ') : claudeBin,
+      viaShell ? [] : args, { cwd: tmp, env, shell: viaShell, windowsHide: true });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill(); reject(new Error('Zeitüberschreitung beim KI-Aufruf')); }, timeoutMs);
     child.stdout.on('data', (d) => (out += d));

@@ -1,34 +1,40 @@
-MedLearn – Installation (Mac)
-=============================
+﻿MedLearn – Installation (Mac und Windows)
+=========================================
 
 Was du brauchst
-- Einen Mac (macOS 12 oder neuer)
-- Optional: ein eigenes Claude-Abo (Pro oder Max).
-  Ohne Abo kannst du alle Lernpakete lernen, die dir jemand schickt.
-  Mit Abo kannst du zusätzlich eigene Skripte verarbeiten lassen und den KI-Tutor nutzen (keine weiteren Kosten).
+- Einen Mac (macOS 13 oder neuer) oder einen Windows-PC (Windows 10/11)
+- Ein eigenes Claude-Abo (Pro oder Max) – MedLearn nutzt dein Abo für die KI, es entstehen keine weiteren Kosten.
 
-Installation (einmalig, ca. 5 Minuten)
-1. Den Ordner „MedLearn“ entpacken (Doppelklick auf die ZIP-Datei).
-2. Im Ordner auf „MedLearn installieren.command“ doppelklicken.
+Installation auf dem MAC (einmalig, ca. 5 Minuten)
+1. Die ZIP-Datei doppelklicken, damit der Ordner „MedLearn“ entpackt wird.
+2. Im Ordner auf „MedLearn installieren (Mac).command“ doppelklicken.
    Falls macOS meldet, dass die Datei nicht geöffnet werden kann:
      → Programm „Terminal“ öffnen, „bash “ eintippen (mit Leerzeichen),
-       die Datei „MedLearn installieren.command“ ins Terminal-Fenster ziehen und Enter drücken.
-3. Den Anweisungen im Fenster folgen. Zuerst wirst du gefragt, ob du ein Claude-Abo hast.
-   Mit Abo meldest du dich einmal bei Claude an (Browser öffnet sich), danach im Terminal „/exit“ eintippen.
-4. Fertig – MedLearn öffnet sich im Browser. Ab jetzt startest du es über das Symbol
-   im Dock oder per Spotlight (⌘ + Leertaste → „MedLearn“).
+       die Datei ins Terminal-Fenster ziehen und Enter drücken.
+3. Den Anweisungen folgen. Beim ersten Mal meldest du dich bei Claude an
+   (Browser öffnet sich), danach im Terminal „/exit“ eintippen.
+4. Fertig – ab jetzt startest du MedLearn über das Symbol im Dock oder per Spotlight.
+
+Installation unter WINDOWS (einmalig, ca. 5 Minuten)
+1. Rechtsklick auf die ZIP-Datei → „Alle extrahieren…“ → „Extrahieren“.
+   (Wichtig: nicht direkt aus der ZIP heraus starten.)
+2. Im entpackten Ordner auf „MedLearn installieren (Windows).cmd“ doppelklicken.
+   Falls „Der Computer wurde durch Windows geschützt“ erscheint:
+     → „Weitere Informationen“ → „Trotzdem ausführen“.
+3. Den Anweisungen im blauen/schwarzen Fenster folgen. Beim ersten Mal meldest du dich
+   bei Claude an (Browser öffnet sich), danach „/exit“ eintippen und Enter drücken.
+4. Fertig – ab jetzt startest du MedLearn über das Symbol auf dem Desktop oder im Startmenü.
+   Tipp: Im Startmenü Rechtsklick auf „MedLearn“ → „An Taskleiste anheften“.
 
 Wo liegen meine Daten?
-- Im Ordner „MedLearn“ in deinem Benutzerordner (~/MedLearn/data).
+- Im Ordner „MedLearn“ in deinem Benutzerordner (Mac: ~/MedLearn/data, Windows: C:\Users\<Name>\MedLearn\data).
   Den entpackten Download-Ordner kannst du nach der Installation löschen.
 
 Updates
-- In MedLearn unter Einstellungen › App › „Nach Updates suchen“ (falls eingerichtet),
-  oder: neue ZIP entpacken und den Installer erneut starten. Deine Daten bleiben erhalten.
+- In MedLearn unter Einstellungen › App › „Nach Updates suchen“ → „Jetzt aktualisieren“.
 
 Lernpakete von Freunden
-- Bibliothek › „Lernpaket importieren“ › .medlearn-Datei wählen. Fertig verarbeitete Skripte
-  sind dann sofort lernbar – ohne dass deine KI sie neu verarbeiten muss.
+- Bibliothek › „Lernpaket importieren“ › .medlearn-Datei wählen. Funktioniert zwischen Mac und Windows.
 
 MedLearn beenden
 - Einstellungen › App › „Beenden“ (oder einfach laufen lassen – es braucht kaum Strom).

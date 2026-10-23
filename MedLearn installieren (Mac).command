@@ -36,7 +36,7 @@ else
   ok "Installer läuft bereits im App-Ordner"
 fi
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
-chmod +x "$DEST/install/start.sh" "$DEST/MedLearn installieren.command" 2>/dev/null || true
+chmod +x "$DEST/install/start.sh" "$DEST/MedLearn installieren (Mac).command" 2>/dev/null || true
 cd "$DEST"
 
 # 2) Node.js (≥ 22.13) – wenn nicht vorhanden, lokal in ~/MedLearn/runtime (kein Admin-Passwort nötig)

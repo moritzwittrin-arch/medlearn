@@ -1,3 +1,4 @@
+import './log.js';
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
@@ -451,7 +452,7 @@ function onListening() {
   console.log(`\n  MedLearn läuft:  ${url}\n  (Beenden mit Strg+C)\n`);
   if (!process.env.MEDLEARN_NO_OPEN) {
     const cmd = process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
-    exec(cmd, () => {});
+    exec(cmd, { windowsHide: true }, () => {});
   }
   // ältere Skripte im Hintergrund um Zuordnungsaufgaben ergänzen
   setTimeout(() => upgradeMatches().catch((e) => console.warn(e.message)).finally(() => upgradeFigures().catch((e) => console.warn(e.message))), 3000);

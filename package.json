@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -21,6 +21,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Ordner, Fortschrittsringe, Gesamtabfrage, Lernpakete"
+    "notes": "Windows-Unterstützung (Installer + Startsymbol)"
   }
 }
