@@ -492,5 +492,17 @@ details.upcard:not([open]) > summary h2::after { content: '+'; color: var(--mute
 @media (max-width: 760px) {
   /* Am Handy wird gelernt – Verwalten (Umbenennen, Verschieben, Löschen, Export) bleibt am Mac */
   #libtree [data-rename], #libtree [data-move], #libtree [data-del], #libtree [data-share], #libtree [data-anki],
-  #libtree [data-frename], #libtree [data-fdel], #libtree .exam-form, #libtree a[href^="/api/pdf"] { display: none !important; }
+  #libtree [data-frename], #libtree [data-fdel], #libtree .exam-form, #libtree a[href*="api/pdf"] { display: none !important; }
 }
+
+/* ===== iPhone-App (offline) ===== */
+body.mobile-app nav.side a[data-nav="tutor"], body.mobile-app details.upcard, body.mobile-app #importPkg, body.mobile-app #newFolder,
+body.mobile-app [data-edit], body.mobile-app [data-tutor], body.mobile-app a[href*="api/pdf"], body.mobile-app #regen,
+body.mobile-app #libtree [data-rename], body.mobile-app #libtree [data-move], body.mobile-app #libtree [data-del], body.mobile-app #libtree [data-share],
+body.mobile-app #libtree [data-anki], body.mobile-app #libtree [data-frename], body.mobile-app #libtree [data-fdel], body.mobile-app #libtree .exam-form,
+body.mobile-app [data-anki], body.mobile-app [data-figrel] { display: none !important; }
+.sync-grid { display: grid; gap: 14px; }
+.sync-step { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--panel-2); justify-items: start; }
+.file-btn { cursor: pointer; margin: 0; }
+.sync-banner { display: grid; gap: 10px; margin-bottom: 14px; border-color: color-mix(in srgb, var(--mark) 45%, var(--border)); background: var(--mark-soft); justify-items: start; }
+.sync-banner.small-b { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .9rem; }

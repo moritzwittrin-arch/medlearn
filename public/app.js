@@ -42,7 +42,7 @@ const KI_LABEL = `<span class="ai-label">${icon('info', 's')} KI-Ergänzung</spa
 async function api(path, opts = {}) {
   const o = { ...opts };
   if (o.body && !(o.body instanceof FormData)) { o.headers = { 'content-type': 'application/json' }; o.body = JSON.stringify(o.body); }
-  const res = await fetch('/api' + path, o);
+  const res = await fetch('api' + path, o);
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || `Fehler ${res.status}`);
   return j;
@@ -117,7 +117,7 @@ function trackDetails(root) {
 // Ist KI verfügbar? (ohne Claude-Abo: Lernen geht, Skript-Verarbeitung/Tutor/Kompakt-Export nicht)
 let AI_ON = true;
 const loadAi = () => api('/settings').then((s) => { AI_ON = s.provider !== 'offline'; }).catch(() => {});
-const noAiBox = (what) => `<div class="noai">${icon('info', 's')}<span><b>${what} braucht ein Claude-Abo.</b> Ohne Abo kannst du alle importierten Lernpakete ganz normal lernen.
+const noAiBox = (what) => window.IS_MOBILE ? `<div class="noai">${icon('info', 's')}<span><b>${what} geht nur in MedLearn am Mac.</b> Hier auf dem iPhone lernst du alles, was der Mac schon vorbereitet hat.</span></div>` : `<div class="noai">${icon('info', 's')}<span><b>${what} braucht ein Claude-Abo.</b> Ohne Abo kannst du alle importierten Lernpakete ganz normal lernen.
   Hast du inzwischen ein Abo? Dann den Installer nochmal starten und bei der Frage nach dem Claude-Abo „j“ wählen.</span></div>`;
 
 async function route() {
@@ -224,7 +224,7 @@ function heroCard(d) {
   const due = d.due.cards + d.due.mc + d.due.match;
   const fresh = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const R = 46, C = 2 * Math.PI * R;
-  const msg = !d.subjects.length ? 'Lade ein Skript hoch, dann geht es los.'
+  const msg = !d.subjects.length ? (window.IS_MOBILE ? 'Lade deine Daten vom Mac, dann geht es los.' : 'Lade ein Skript hoch, dann geht es los.')
     : done >= goal ? `Tagesziel geschafft – ${done} Antworten${d.today.reviews ? `, ${Math.round(100 * d.today.correct / d.today.reviews)} % richtig` : ''}.`
       : done ? `Noch ${goal - done} Antworten bis zu deinem Tagesziel.` : due ? `${due} Wiederholungen warten auf dich.` : 'Starte mit ein paar neuen Inhalten.';
   return `<section class="hero">
@@ -238,7 +238,7 @@ function heroCard(d) {
         <span class="chip">${due} fällig</span><span class="chip">${fresh} neu</span>
         ${d.openMistakes ? `<a class="chip" href="#/fehler">${d.openMistakes} offene Fehler</a>` : ''}
       </div>
-      ${d.subjects.length ? `<a class="btn big hero-cta" href="#/lernen">${icon('play')} Jetzt lernen</a>` : `<a class="btn big hero-cta" href="#/bibliothek">${icon('upload')} Skript hochladen</a>`}
+      ${d.subjects.length ? `<a class="btn big hero-cta" href="#/lernen">${icon('play')} Jetzt lernen</a>` : (window.IS_MOBILE ? `<a class="btn big hero-cta" href="#/einstellungen">${icon('upload')} Daten laden</a>` : `<a class="btn big hero-cta" href="#/bibliothek">${icon('upload')} Skript hochladen</a>`)}
     </div>
     <div class="hero-goal" title="Tagesziel: ${goal} Antworten (änderbar in den Einstellungen)">
       <svg viewBox="0 0 110 110"><circle cx="55" cy="55" r="${R}" class="g-track"/>
@@ -251,11 +251,11 @@ function heroCard(d) {
 
 // ---------- Dashboard ----------
 async function viewDashboard(soft = false) {
-  const [d, saved, weak] = await Promise.all([api('/dashboard'), api('/saved-sessions').catch(() => []), api('/weak?limit=4').catch(() => [])]);
+  const [d, saved, weak, banner] = await Promise.all([api('/dashboard'), api('/saved-sessions').catch(() => []), api('/weak?limit=4').catch(() => []), mobileBanner()]);
   const totalNew = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const hasContent = d.subjects.length > 0;
   setView(`
-  ${heroCard(d)}
+  ${banner}${heroCard(d)}
   ${d.processing.map((p) => `
     <div class="card" style="margin-bottom:16px">
       <div class="row between"><b class="row" style="gap:8px">${icon('file')} ${esc(p.title)}</b>
@@ -263,7 +263,7 @@ async function viewDashboard(soft = false) {
       <div class="bar" style="margin:10px 0 6px"><div style="width:${Math.round(p.progress * 100)}%"></div></div>
       <div class="small ${p.status === 'fehler' ? '' : 'muted'}" style="${p.status === 'fehler' ? 'color:var(--bad)' : ''}">${esc(p.status === 'fehler' ? p.error : p.message)}</div>
     </div>`).join('')}
-  ${!hasContent ? `
+  ${!hasContent && window.IS_MOBILE ? '' : !hasContent ? `
     <div class="card empty">
       <h2>Willkommen bei MedLearn</h2>
       <p>Lade dein erstes Skript hoch – daraus entstehen automatisch Wissensbasis, Karteikarten, Lückentexte, MC-Fragen, Fälle und Zuordnungsaufgaben.
@@ -458,7 +458,7 @@ function shareDialog(scope, name) {
     const btn = e.currentTarget; btn.disabled = true;
     const res = m.querySelector('#pkgRes'); res.innerHTML = '<span class="spinner"></span> Wird gepackt …';
     try {
-      const r = await fetch(`/api/export/package?scope=${encodeURIComponent(scope)}&pdf=${m.querySelector('#withPdf').checked ? 1 : 0}`);
+      const r = await fetch(`api/export/package?scope=${encodeURIComponent(scope)}&pdf=${m.querySelector('#withPdf').checked ? 1 : 0}`);
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Fehler ${r.status}`);
       const blob = await r.blob();
       const fn = decodeURIComponent((r.headers.get('content-disposition') || '').match(/filename\*=UTF-8''([^;]+)/)?.[1] || 'lernpaket.medlearn');
@@ -548,7 +548,7 @@ function libTreeHtml(lib, folders = []) {
             ${d.status === 'fertig' ? '' : d.status === 'fehler' ? '<span class="tag bad">Fehler</span>' : `<span class="tag warn">${esc(d.message || d.status)}</span>`}</span>
             <span class="row">
               ${d.status === 'fehler' && !d.running ? `<button class="small" data-resume="${d.id}">Fortsetzen</button>` : ''}
-              ${d.has_pdf ? `<a class="btn small" href="/api/pdf/${d.id}" target="_blank">PDF</a>` : ''}
+              ${d.has_pdf ? `<a class="btn small" href="api/pdf/${d.id}" target="_blank">PDF</a>` : ''}
               ${d.status === 'fertig' ? `<button class="small" data-anki="document:${d.id}" data-anki-name="${esc(d.title)}" title="Als Anki-Stapel exportieren">${icon('archive', 's')} Anki</button>` : ''}
               <a class="btn small" href="#/lernen?scope=document:${d.id}">Lernen</a>
               ${d.status === 'fertig' ? `<button class="small ghost" data-share="document:${d.id}" data-share-name="${esc(d.title)}" title="Als Lernpaket mit Freunden teilen">${icon('share', 's')}</button>` : ''}
@@ -639,7 +639,7 @@ async function viewTopic(id) {
     <a class="btn" href="#/lernen?scope=topic:${t.id}&mode=mc">Nur MC</a>
     <a class="btn" href="#/lernen?scope=topic:${t.id}&mode=match">Nur Zuordnung</a>
     <a class="btn" href="#/tutor?topic=${t.id}">${icon('chat')} Tutor fragen</a>
-    <a class="btn" href="/api/pdf/${t.doc_id}#page=${t.page_from}" target="_blank">${icon('external')} PDF, Seite ${t.page_from}</a>
+    <a class="btn" href="api/pdf/${t.doc_id}#page=${t.page_from}" target="_blank">${icon('external')} PDF, Seite ${t.page_from}</a>
   </div>
   <div class="grid stats" style="margin-bottom:16px">
     ${['flashcard', 'cloze', 'mc', 'case', 'match'].map((k) => `<div class="card stat"><div class="num">${counts[k] || 0}</div><div class="lbl">${KIND_LABEL[k]}</div></div>`).join('')}
@@ -690,7 +690,7 @@ async function showSource(itemId) {
     <div class="small" style="margin-bottom:12px"><b>${esc(s.doc)}</b> · ${pagesLabel(s.pages)}<br>Kapitel: ${esc(s.chapter)} › ${esc(s.topic)}</div>
     <h3>Zugrundeliegende Wissenseinheiten</h3>
     ${s.units.map((u) => `<div class="unit"><span class="muted small">S. ${u.page}</span><span>${esc(u.content)}</span></div>`).join('') || '<div class="muted small">Keine direkte Zuordnung.</div>'}
-    <div class="row" style="margin:14px 0">${(s.pages.length ? s.pages : [1]).map((p) => `<a class="btn small primary" target="_blank" href="/api/pdf/${s.docId}#page=${p}">PDF öffnen – Seite ${p}</a>`).join('')}</div>
+    <div class="row" style="margin:14px 0">${(s.pages.length ? s.pages : [1]).map((p) => `<a class="btn small primary" target="_blank" href="api/pdf/${s.docId}#page=${p}">PDF öffnen – Seite ${p}</a>`).join('')}</div>
     ${s.figures?.length ? `<h3>Abbildungen auf ${s.figures.length > 1 ? 'diesen Seiten' : 'dieser Seite'}</h3><div class="fig-grid">${s.figures.map((f) => `<figure>${figImg(f.id)}<figcaption>${esc(f.title || f.caption || '')} <span class="muted">S. ${f.page}</span></figcaption></figure>`).join('')}</div>` : ''}
     ${s.pageTexts.map((p) => `<h3>Seite ${p.page} (Textauszug)</h3><div class="pagetext">${hl(p.text)}</div>`).join('<br>')}`);
 }
@@ -1202,10 +1202,10 @@ async function viewSearch(term) {
   document.getElementById('sr').innerHTML = `
     <div class="grid cols-2">
       <div class="card"><h3>Wissensbasis (${r.units.length})</h3>
-        ${r.units.length ? `<ul class="list">${r.units.map((u) => `<li>${esc(u.content)}<div class="muted small"><a href="#/thema/${u.topicId}">${esc(u.topic)}</a> · ${esc(u.doc)} · <a target="_blank" href="/api/pdf/${u.docId}#page=${u.page}">S. ${u.page}</a></div></li>`).join('')}</ul>` : '<div class="muted small">Keine Treffer.</div>'}
+        ${r.units.length ? `<ul class="list">${r.units.map((u) => `<li>${esc(u.content)}<div class="muted small"><a href="#/thema/${u.topicId}">${esc(u.topic)}</a> · ${esc(u.doc)} · <a target="_blank" href="api/pdf/${u.docId}#page=${u.page}">S. ${u.page}</a></div></li>`).join('')}</ul>` : '<div class="muted small">Keine Treffer.</div>'}
       </div>
       <div class="card"><h3>Skriptseiten (${r.pages.length})</h3>
-        ${r.pages.length ? `<ul class="list">${r.pages.map((p) => `<li><a target="_blank" href="/api/pdf/${p.docId}#page=${p.page}"><b>${esc(p.doc)} – S. ${p.page}</b></a><div class="small">${hl(p.snippet)}</div></li>`).join('')}</ul>` : '<div class="muted small">Keine Treffer.</div>'}
+        ${r.pages.length ? `<ul class="list">${r.pages.map((p) => `<li><a target="_blank" href="api/pdf/${p.docId}#page=${p.page}"><b>${esc(p.doc)} – S. ${p.page}</b></a><div class="small">${hl(p.snippet)}</div></li>`).join('')}</ul>` : '<div class="muted small">Keine Treffer.</div>'}
       </div>
     </div>`;
 }
@@ -1284,12 +1284,47 @@ async function viewMistakes() {
   $app.querySelectorAll('[data-src]').forEach((a) => a.onclick = (e) => { e.preventDefault(); showSource(a.dataset.src); });
 }
 
+// ---------- iPhone-App (offline) – Einstellungen am Mac ----------
+async function renderIphoneCard() {
+  const box = document.getElementById('iphoneCard'); if (!box) return;
+  let s; try { s = await api('/mobile/status'); } catch (e) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="row between"><h2 style="margin:0">iPhone-App (auch unterwegs, ohne Mac)</h2></div>
+    <div class="phone-pair">
+      <div class="qr">${s.qr}</div>
+      <ol class="phone-steps">
+        <li>QR-Code mit der iPhone-Kamera scannen (öffnet <code>${esc(s.url.replace('https://', ''))}</code>).</li>
+        <li>In Safari: <b>Teilen ${icon('share', 's')} → „Zum Home-Bildschirm“</b>. Die App funktioniert danach auch offline.</li>
+        <li>In der App: <b>Einstellungen › Datei wählen</b> › iCloud Drive › MedLearn › <b>MedLearn-Daten.json</b>.</li>
+        <li>Nach dem Lernen: <b>„Fortschritt sichern“</b> › In Dateien sichern › iCloud Drive › MedLearn. Der Mac übernimmt die Antworten automatisch.</li>
+      </ol>
+    </div>
+    ${s.icloud ? `<div class="small"><span style="color:var(--good)">${icon('check', 's')}</span> Der Mac legt deinen Lernstand automatisch in <b>${esc(s.folder)}</b> ab
+        (zuletzt: ${s.lastExport ? fmtWhen(s.lastExport.at) : '–'}${s.size ? `, ${(s.size / 1048576).toFixed(1)} MB` : ''}).
+        ${s.lastImport ? `Zuletzt vom iPhone übernommen: ${fmtWhen(s.lastImport.at)} (${s.lastImport.added} Antworten).` : ''}</div>`
+      : `<div class="small" style="color:var(--warn)">iCloud Drive ist auf diesem Mac nicht eingeschaltet. Einschalten unter Systemeinstellungen › Apple-ID › iCloud › iCloud Drive – oder die Dateien unten von Hand übertragen (z. B. per AirDrop).</div>`}
+    <div class="row"><button class="small" id="syncNow">${icon('rotate', 's')} Jetzt abgleichen</button>
+      <a class="btn small ghost" href="api/mobile/pack" download>Daten-Datei speichern</a>
+      <label class="btn small ghost file-btn">Fortschritt vom iPhone importieren<input type="file" id="progFile" accept=".json" hidden></label></div>`;
+  box.querySelector('#syncNow').onclick = async (e) => {
+    e.target.disabled = true;
+    try { const r = await api('/mobile/sync', { method: 'POST' }); const n = r.imported.reduce((a, x) => a + x.added, 0);
+      toast(r.exported.ok ? `Abgeglichen${n ? ` – ${n} Antworten vom iPhone übernommen` : ''}` : 'iCloud Drive nicht gefunden'); renderIphoneCard(); }
+    catch (err) { toast(err.message); e.target.disabled = false; }
+  };
+  box.querySelector('#progFile').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    try { const r = await api('/mobile/import', { method: 'POST', body: fd }); toast(`${r.added} Antworten vom iPhone übernommen`); renderIphoneCard(); }
+    catch (err) { toast(err.message); }
+  };
+}
+
 // ---------- Handy-Zugriff (nur am Mac sichtbar) ----------
 async function renderPhoneCard() {
   const box = document.getElementById('phoneCard'); if (!box) return;
-  let r; try { r = await api('/remote'); } catch (e) { box.innerHTML = `<h2>Am Handy lernen</h2><div class="muted small">${esc(e.message)}</div>`; return; }
+  let r; try { r = await api('/remote'); } catch (e) { box.innerHTML = `<h2>Im WLAN auf den Mac zugreifen</h2><div class="muted small">${esc(e.message)}</div>`; return; }
   const live = r.enabled && r.listening === '0.0.0.0';
-  box.innerHTML = `<div class="row between"><h2 style="margin:0">Am Handy lernen</h2>
+  box.innerHTML = `<div class="row between"><h2 style="margin:0">Im WLAN auf den Mac zugreifen</h2>
       <label class="switch-row"><input type="checkbox" id="phoneOn" ${r.enabled ? 'checked' : ''}> Handy-Zugriff erlauben</label></div>
     ${!r.enabled ? `<div class="muted small">Damit kannst du MedLearn auf dem iPhone oder iPad nutzen, solange es im <b>selben WLAN</b> wie dein Mac ist und der Mac eingeschaltet ist.
         Nur Geräte, die du per QR-Code verbindest, kommen hinein.</div>`
@@ -1329,6 +1364,7 @@ async function renderPhoneCard() {
 // Einstellungen auf dem Handy: nur Profil (KI, Updates & Co. gibt es am Mac)
 function viewSettingsRemote(prof) {
   setView(`<h1>Einstellungen</h1>
+  ${window.IS_MOBILE ? '<div class="card stack" style="margin-bottom:16px" id="syncCard"></div>' : ''}
   <div class="card stack" style="margin-bottom:16px">
     <h2>Du</h2>
     <form id="profForm" class="stack">
@@ -1345,6 +1381,59 @@ function viewSettingsRemote(prof) {
     catch (err) { toast(err.message); }
   };
   document.getElementById('themeBtn').onclick = () => document.getElementById('themeToggle').click();
+  if (window.IS_MOBILE) renderSyncCard();
+}
+
+// ---------- iPhone-App: Abgleich mit dem Mac über iCloud Drive ----------
+const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString('de-AT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–');
+async function renderSyncCard() {
+  const box = document.getElementById('syncCard'); if (!box) return;
+  const s = await api('/mobile/status');
+  box.innerHTML = `<h2>Abgleich mit dem Mac</h2>
+    <div class="sync-grid">
+      <div class="sync-step"><b>1. Daten vom Mac laden</b>
+        <div class="muted small">${s.hasData ? `Stand vom ${fmtWhen(s.created)} · ${s.items} Lerninhalte aus ${s.documents} Skripten` : 'Noch keine Daten auf diesem iPhone.'}</div>
+        <label class="btn primary file-btn">${icon('upload', 's')} Datei wählen<input type="file" id="packFile" accept=".json,application/json" hidden></label>
+        <div class="muted small">In der Dateiauswahl: <b>iCloud Drive › MedLearn › MedLearn-Daten.json</b>. Der Mac hält diese Datei automatisch aktuell.</div></div>
+      <div class="sync-step"><b>2. Fortschritt an den Mac geben</b>
+        <div class="muted small">${s.pending ? `<b>${s.pending}</b> Antworten von diesem iPhone sind noch nicht am Mac.${s.lastSaved ? ` Zuletzt gesichert: ${fmtWhen(s.lastSaved)}.` : ''}` : 'Alles abgeglichen – keine neuen Antworten.'}</div>
+        <button id="saveProg" ${s.pending ? 'class="primary"' : ''}>${icon('share', 's')} Fortschritt sichern</button>
+        <div class="muted small">Im Teilen-Menü <b>„In Dateien sichern“ › iCloud Drive › MedLearn</b> wählen. Der Mac übernimmt die Antworten innerhalb von 2 Minuten.</div></div>
+    </div>`;
+  box.querySelector('#packFile').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    toast('Daten werden geladen …');
+    try {
+      const pack = JSON.parse(await f.text());
+      const r = await api('/mobile/import', { method: 'POST', body: pack });
+      toast(`Geladen: ${r.items} Lerninhalte (Stand ${fmtWhen(r.created)})`, 4500);
+      renderSyncCard();
+    } catch (err) { toast(err.message || 'Datei konnte nicht gelesen werden'); }
+  };
+  box.querySelector('#saveProg').onclick = saveProgress;
+}
+async function saveProgress() {
+  const data = await api('/mobile/export');
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const file = new File([JSON.stringify(data)], `MedLearn-Fortschritt-${stamp}.json`, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'MedLearn-Fortschritt' }); toast('Gesichert – der Mac übernimmt die Antworten automatisch.'); renderSyncCard(); return; }
+  } catch (err) { if (err && err.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('Gespeichert (Downloads) – der Mac übernimmt die Antworten automatisch.'); renderSyncCard();
+}
+async function mobileBanner() {
+  if (!window.IS_MOBILE) return '';
+  const s = await api('/mobile/status').catch(() => null);
+  if (!s) return '';
+  if (!s.hasData) return `<div class="card sync-banner"><b>Willkommen bei MedLearn auf dem iPhone</b>
+    <div class="small">Lade einmal deine Daten vom Mac: Einstellungen › „Datei wählen“ › iCloud Drive › MedLearn › MedLearn-Daten.json.</div>
+    <a class="btn primary" href="#/einstellungen">Daten laden</a></div>`;
+  const old = Date.now() - new Date(s.created).getTime() > 3 * 864e5;
+  if (s.pending >= 10 || old) return `<div class="card sync-banner small-b"><span>${s.pending >= 10 ? `<b>${s.pending} Antworten</b> sind noch nicht am Mac gesichert.` : ''} ${old ? `Deine Daten sind vom ${fmtWhen(s.created)}.` : ''}</span>
+    <a class="btn small" href="#/einstellungen">Abgleichen</a></div>`;
+  return '';
 }
 
 // ---------- Einstellungen ----------
@@ -1379,6 +1468,7 @@ async function viewSettings() {
     <div class="muted small">Tipp: „sonnet“ ist der beste Kompromiss aus Qualität und Verbrauch deines Abo-Kontingents. „opus“ liefert die gründlichste Extraktion, verbraucht aber dein Nutzungslimit schneller.</div>
     <div class="row"><button class="primary" id="save">Speichern</button><button id="test">Verbindung testen</button><span id="tres" class="small"></span></div>
   </div>
+  <div class="card stack" style="margin-top:16px" id="iphoneCard"></div>
   <div class="card stack" style="margin-top:16px" id="phoneCard"></div>
   <div class="card stack" style="margin-top:16px">
     <h2>App</h2>
@@ -1401,6 +1491,7 @@ async function viewSettings() {
   };
   loadBackups();
   renderPhoneCard();
+  renderIphoneCard();
   document.getElementById('profForm').onsubmit = async (e) => {
     e.preventDefault();
     try { await api('/profile', { method: 'POST', body: { name: e.target.name.value, goal: e.target.goal.value } }); toast('Gespeichert'); }
@@ -1461,7 +1552,7 @@ async function viewSettings() {
 }
 
 // ---------- Abbildungen ----------
-const figImg = (id, cls = '') => `<img class="fig-img ${cls}" src="/api/figures/${id}/img" alt="Abbildung aus dem Skript" loading="lazy" data-zoom="${id}">`;
+const figImg = (id, cls = '') => `<img class="fig-img ${cls}" src="api/figures/${id}/img" alt="Abbildung aus dem Skript" loading="lazy" data-zoom="${id}">`;
 const figFront = (id) => `<div class="fig-front">${figImg(id)}</div>`;
 // Rückseite einer Bildkarte: Titel + Beschreibung der Abbildung (wird nachgeladen)
 function figNote(id) {
@@ -1482,7 +1573,7 @@ document.addEventListener('click', async (e) => {
   const img = e.target.closest('[data-zoom]'); if (!img) return;
   e.preventDefault();
   const m = modal(`<div class="row between"><h2 id="zt">Abbildung</h2><button class="ghost" data-close title="Schließen">${icon('x')}</button></div>
-    <img class="fig-zoom" src="/api/figures/${img.dataset.zoom}/img" alt=""><div id="zd" class="small" style="margin-top:10px"></div>`);
+    <img class="fig-zoom" src="api/figures/${img.dataset.zoom}/img" alt=""><div id="zd" class="small" style="margin-top:10px"></div>`);
   m.classList.add('zoom-bg');
   try {
     const f = await api(`/figures/${img.dataset.zoom}`);
@@ -1529,7 +1620,7 @@ function ankiDialog(scope, name) {
         if (job.errors.length) toast(`${job.errors.length} Thema/Themen konnten nicht verdichtet werden – bitte später erneut exportieren.`, 7000);
         info = job.source ? ` statt ${job.source} einzelner Karteikarten/Lückentexte` : '';
       } else out.innerHTML = '<span class="spinner"></span> wird erstellt …';
-      const res = await fetch(`/api/export/anki?scope=${encodeURIComponent(scope)}&kinds=${sel.join(',')}${compact ? '&compact=1' : ''}`);
+      const res = await fetch(`api/export/anki?scope=${encodeURIComponent(scope)}&kinds=${sel.join(',')}${compact ? '&compact=1' : ''}`);
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || (res.status === 404 ? 'Bitte die App neu starten (control + C, dann npm run dev).' : `Fehler ${res.status}`)); }
       const blob = await res.blob();
       const fn = decodeURIComponent((res.headers.get('Content-Disposition') || '').match(/filename\*=UTF-8''([^;]+)/)?.[1] || 'medlearn.apkg');
@@ -1748,4 +1839,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.IS_LOCAL = true;
-api('/whoami').then((w) => { window.IS_LOCAL = !!w.local; document.body.classList.toggle('remote', !w.local); }).catch(() => {}).finally(route);
+window.IS_MOBILE = false;
+(async function boot() {
+  // iPhone-App (GitHub Pages): Der Service Worker beantwortet alle api/…-Anfragen offline – erst starten, wenn er aktiv ist
+  if (window.MEDLEARN_MOBILE && 'serviceWorker' in navigator) {
+    try {
+      await navigator.serviceWorker.register('sw.js');
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) {
+        await new Promise((ok) => { navigator.serviceWorker.addEventListener('controllerchange', ok, { once: true }); setTimeout(ok, 3000); });
+        if (!navigator.serviceWorker.controller) { location.reload(); return; }
+      }
+    } catch (e) { $app.innerHTML = `<div class="card empty"><h2>Offline-Speicher nicht verfügbar</h2><p>${esc(e.message)}</p></div>`; return; }
+  }
+  try {
+    const w = await api('/whoami');
+    window.IS_LOCAL = !!w.local; window.IS_MOBILE = !!w.mobile;
+    document.body.classList.toggle('remote', !w.local);
+    document.body.classList.toggle('mobile-app', !!w.mobile);
+  } catch {}
+  route();
+})();

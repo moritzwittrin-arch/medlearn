@@ -11,6 +11,8 @@ import { FIG_DIR, applyFiguresToTopic } from './figures.js';
 import { exportPackage, importPackage } from './package.js';
 import { findWeakSpots, createDrill, getDrill } from './weak.js';
 import { remoteGuard, remoteInfo, setRemote, resetRemoteToken, listenHost, isLocal } from './remote.js';
+import { mobileStatus, mobileSyncNow, buildPack, importProgress, startMobileSync, MOBILE_URL } from './mobile.js';
+import QRCode from 'qrcode';
 import { checkUpdate, applyUpdate, restartServer, currentVersion } from './update.js';
 import { review, buildSession, dashboard, hydrate, previewIntervals } from './srs.js';
 import { completeJson, complete, testConnection, aiSettings } from './ai.js';
@@ -440,6 +442,23 @@ app.post('/api/remote', wrap((req) => {
 }));
 app.post('/api/remote/reset', wrap(() => { resetRemoteToken(); return { ok: true }; }));
 
+// ---------- iPhone-App (offline, Abgleich über iCloud Drive) ----------
+app.get('/api/mobile/status', wrap(async () => ({ ...mobileStatus(), qr: await QRCode.toString(MOBILE_URL, { type: 'svg', margin: 1 }) })));
+app.post('/api/mobile/sync', wrap(() => mobileSyncNow()));
+app.get('/api/mobile/pack', (req, res) => {
+  try {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="MedLearn-Daten.json"');
+    res.end(JSON.stringify(buildPack()));
+  } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
+});
+const jsonUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+app.post('/api/mobile/import', jsonUpload.single('file'), wrap((req) => {
+  if (!req.file) throw fail('Bitte die Fortschrittsdatei vom iPhone auswählen.');
+  let data; try { data = JSON.parse(req.file.buffer.toString('utf8')); } catch { throw fail('Die Datei ist kein gültiger MedLearn-Fortschritt.'); }
+  return importProgress(data);
+}));
+
 // ---------- Profil (Name für die Begrüßung, Tagesziel) ----------
 app.get('/api/profile', wrap(() => getSetting('profile', { name: '', goal: 50 })));
 app.post('/api/profile', wrap((req) => {
@@ -484,6 +503,7 @@ function onListening() {
     const cmd = process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
     exec(cmd, { windowsHide: true }, () => {});
   }
+  startMobileSync();   // iPhone-App: Lernstand in iCloud Drive aktuell halten, Antworten vom iPhone übernehmen
   // ältere Skripte im Hintergrund um Zuordnungsaufgaben ergänzen
   setTimeout(() => upgradeMatches().catch((e) => console.warn(e.message)).finally(() => upgradeFigures().catch((e) => console.warn(e.message))), 3000);
 }

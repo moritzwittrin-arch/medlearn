@@ -53,7 +53,7 @@ export async function applyUpdate() {
     for (const [name, data] of files) {
       const rel = top && name.startsWith(top) ? name.slice(top.length) : name;
       if (!rel || rel.endsWith('/')) continue;
-      if (/^(data|node_modules|runtime)\//.test(rel) || rel.includes('..')) continue;
+      if (/^(data|node_modules|runtime|docs)\//.test(rel) || rel.includes('..')) continue;
       const dest = path.join(APP_DIR, rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, data);

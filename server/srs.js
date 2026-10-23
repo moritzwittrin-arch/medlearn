@@ -5,12 +5,13 @@ import { q, one, run, tx, ITEM_OK, getSetting } from './db.js';
 const scheduler = fsrs(generatorParameters({ enable_fuzz: true, request_retention: 0.9 }));
 const nowIso = () => new Date().toISOString();
 
-export function review(itemId, rating, { correct = rating >= 3, answer = null, mistake = null } = {}) {
+export function review(itemId, rating, { correct = rating >= 3, answer = null, mistake = null, at = null } = {}) {
   rating = Math.min(4, Math.max(1, parseInt(rating) || 1));
   const item = one('SELECT * FROM items WHERE id=?', itemId);
   if (!item) throw new Error('Lerninhalt nicht gefunden');
   const st = one('SELECT * FROM item_state WHERE item_id=?', itemId);
-  const now = new Date();
+  const now = at ? new Date(at) : new Date();   // at: Zeitpunkt einer Antwort vom iPhone (nachträglich übernommen)
+  const tsSql = now.toISOString().replace('T', ' ').slice(0, 19);
   const card = st ? TypeConvert.card(JSON.parse(st.card)) : createEmptyCard(now);
   const { card: next } = scheduler.next(card, now, [0, Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][rating]);
   tx(() => {
@@ -20,10 +21,10 @@ export function review(itemId, rating, { correct = rating >= 3, answer = null, m
            lapses=excluded.lapses, wrong=item_state.wrong + ?, last_rating=excluded.last_rating, last_review=excluded.last_review`,
       itemId, JSON.stringify(next), next.due.toISOString(), next.reps, next.lapses, correct ? 0 : 1, rating, now.toISOString(),
       correct ? 0 : 1);
-    run('INSERT INTO review_log(item_id,rating,correct,answer) VALUES(?,?,?,?)', itemId, rating, correct ? 1 : 0, answer);
+    run('INSERT INTO review_log(item_id,rating,correct,answer,ts) VALUES(?,?,?,?,?)', itemId, rating, correct ? 1 : 0, answer, tsSql);
     if (!correct) {
-      run('INSERT INTO mistakes(item_id,topic_id,description,user_answer) VALUES(?,?,?,?)',
-        itemId, item.topic_id, mistake || defaultMistake(item), answer);
+      run('INSERT INTO mistakes(item_id,topic_id,description,user_answer,ts) VALUES(?,?,?,?,?)',
+        itemId, item.topic_id, mistake || defaultMistake(item), answer, tsSql);
     } else if (rating >= 3) {
       run('UPDATE mistakes SET resolved=1 WHERE item_id=? AND resolved=0', itemId);
     }

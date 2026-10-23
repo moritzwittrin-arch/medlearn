@@ -1,11 +1,12 @@
 {
   "name": "medlearn",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
     "dev": "node --disable-warning=ExperimentalWarning server/index.js",
-    "start": "node --disable-warning=ExperimentalWarning server/index.js"
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "build:mobile": "node scripts/build-mobile.mjs"
   },
   "dependencies": {
     "express": "^4.22.3",
@@ -22,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Am iPhone lernen: Handy-Zugriff im WLAN per QR-Code, App-Symbol für den Home-Bildschirm, Handy-Ansicht mit Tab-Leiste"
+    "notes": "iPhone-App für unterwegs: offline lernen ohne Mac, Abgleich über iCloud Drive"
   }
 }
