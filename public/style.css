@@ -506,3 +506,7 @@ body.mobile-app [data-anki], body.mobile-app [data-figrel] { display: none !impo
 .file-btn { cursor: pointer; margin: 0; }
 .sync-banner { display: grid; gap: 10px; margin-bottom: 14px; border-color: color-mix(in srgb, var(--mark) 45%, var(--border)); background: var(--mark-soft); justify-items: start; }
 .sync-banner.small-b { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .9rem; }
+
+/* Datei-Auswahl: unsichtbar, aber nicht „display:none“ (sonst reagiert iOS teils nicht) */
+.file-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.file-btn { position: relative; }

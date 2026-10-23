@@ -3,7 +3,7 @@
  * offline aus den Daten, die der Mac über iCloud Drive bereitstellt (MedLearn-Daten.json).
  * Antworten werden lokal gespeichert und als „MedLearn-Fortschritt-….json“ zurück an den Mac gegeben. */
 'use strict';
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 const CACHE = `medlearn-shell-${VERSION}`;
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'vendor/fsrs.umd.js'];
 
@@ -13,7 +13,7 @@ const scheduler = fsrs(generatorParameters({ enable_fuzz: true, request_retentio
 const RATINGS = [0, Rating.Again, Rating.Hard, Rating.Good, Rating.Easy];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('medlearn-shell-') && k !== CACHE).map((k) => caches.delete(k))))

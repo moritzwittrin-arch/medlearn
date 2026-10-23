@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -23,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "iPhone-App für unterwegs: offline lernen ohne Mac, Abgleich über iCloud Drive"
+    "notes": "iPhone: Datei-Auswahl für MedLearn-Daten.json repariert"
   }
 }

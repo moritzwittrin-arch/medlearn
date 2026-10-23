@@ -1304,7 +1304,7 @@ async function renderIphoneCard() {
       : `<div class="small" style="color:var(--warn)">iCloud Drive ist auf diesem Mac nicht eingeschaltet. Einschalten unter Systemeinstellungen › Apple-ID › iCloud › iCloud Drive – oder die Dateien unten von Hand übertragen (z. B. per AirDrop).</div>`}
     <div class="row"><button class="small" id="syncNow">${icon('rotate', 's')} Jetzt abgleichen</button>
       <a class="btn small ghost" href="api/mobile/pack" download>Daten-Datei speichern</a>
-      <label class="btn small ghost file-btn">Fortschritt vom iPhone importieren<input type="file" id="progFile" accept=".json" hidden></label></div>`;
+      <label class="btn small ghost file-btn">Fortschritt vom iPhone importieren<input type="file" id="progFile" class="file-hidden"></label></div>`;
   box.querySelector('#syncNow').onclick = async (e) => {
     e.target.disabled = true;
     try { const r = await api('/mobile/sync', { method: 'POST' }); const n = r.imported.reduce((a, x) => a + x.added, 0);
@@ -1393,23 +1393,32 @@ async function renderSyncCard() {
     <div class="sync-grid">
       <div class="sync-step"><b>1. Daten vom Mac laden</b>
         <div class="muted small">${s.hasData ? `Stand vom ${fmtWhen(s.created)} · ${s.items} Lerninhalte aus ${s.documents} Skripten` : 'Noch keine Daten auf diesem iPhone.'}</div>
-        <label class="btn primary file-btn">${icon('upload', 's')} Datei wählen<input type="file" id="packFile" accept=".json,application/json" hidden></label>
+        <label class="btn primary file-btn">${icon('upload', 's')} Datei wählen<input type="file" id="packFile" class="file-hidden"></label>
+        <div id="packMsg" class="small"></div>
         <div class="muted small">In der Dateiauswahl: <b>iCloud Drive › MedLearn › MedLearn-Daten.json</b>. Der Mac hält diese Datei automatisch aktuell.</div></div>
       <div class="sync-step"><b>2. Fortschritt an den Mac geben</b>
         <div class="muted small">${s.pending ? `<b>${s.pending}</b> Antworten von diesem iPhone sind noch nicht am Mac.${s.lastSaved ? ` Zuletzt gesichert: ${fmtWhen(s.lastSaved)}.` : ''}` : 'Alles abgeglichen – keine neuen Antworten.'}</div>
         <button id="saveProg" ${s.pending ? 'class="primary"' : ''}>${icon('share', 's')} Fortschritt sichern</button>
         <div class="muted small">Im Teilen-Menü <b>„In Dateien sichern“ › iCloud Drive › MedLearn</b> wählen. Der Mac übernimmt die Antworten innerhalb von 2 Minuten.</div></div>
     </div>`;
-  box.querySelector('#packFile').onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    toast('Daten werden geladen …');
+  const input = box.querySelector('#packFile'), msg = box.querySelector('#packMsg');
+  let busy = false;
+  const onPick = async () => {
+    const f = input.files && input.files[0]; if (!f || busy) return;
+    busy = true;
+    msg.innerHTML = `<span class="spinner"></span> „${esc(f.name)}“ wird geladen …`;
     try {
-      const pack = JSON.parse(await f.text());
+      const text = await f.text();
+      let pack;
+      try { pack = JSON.parse(text); } catch { throw new Error(`„${f.name}“ ist keine MedLearn-Datendatei. Bitte „MedLearn-Daten.json“ aus iCloud Drive › MedLearn wählen.`); }
       const r = await api('/mobile/import', { method: 'POST', body: pack });
       toast(`Geladen: ${r.items} Lerninhalte (Stand ${fmtWhen(r.created)})`, 4500);
       renderSyncCard();
-    } catch (err) { toast(err.message || 'Datei konnte nicht gelesen werden'); }
+    } catch (err) { msg.innerHTML = `<span style="color:var(--bad)">${esc(err.message || 'Datei konnte nicht gelesen werden')}</span>`; input.value = ''; }
+    busy = false;
   };
+  input.addEventListener('change', onPick);
+  input.addEventListener('input', onPick);
   box.querySelector('#saveProg').onclick = saveProgress;
 }
 async function saveProgress() {
@@ -1844,8 +1853,12 @@ window.IS_MOBILE = false;
   // iPhone-App (GitHub Pages): Der Service Worker beantwortet alle api/…-Anfragen offline – erst starten, wenn er aktiv ist
   if (window.MEDLEARN_MOBILE && 'serviceWorker' in navigator) {
     try {
-      await navigator.serviceWorker.register('sw.js');
+      const hadController = !!navigator.serviceWorker.controller;
+      const reg = await navigator.serviceWorker.register('sw.js');
       await navigator.serviceWorker.ready;
+      // neue App-Version installiert → einmal neu laden, damit sie sofort gilt
+      if (hadController) navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+      reg.update().catch(() => {});
       if (!navigator.serviceWorker.controller) {
         await new Promise((ok) => { navigator.serviceWorker.addEventListener('controllerchange', ok, { once: true }); setTimeout(ok, 3000); });
         if (!navigator.serviceWorker.controller) { location.reload(); return; }
