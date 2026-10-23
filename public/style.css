@@ -69,12 +69,22 @@ nav.side .spacer { flex: 1; }
 nav.side kbd, nav.side .nav-kbd { background: rgba(255,255,255,.08) !important; border-color: rgba(255,255,255,.12) !important; color: var(--side-muted) !important; }
 main { padding: 36px 44px 80px; max-width: 1100px; width: 100%; }
 @media (max-width: 760px) {
+  /* Handy: Navigation als Tab-Leiste unten (wie eine App) */
   .layout { grid-template-columns: 1fr; }
-  nav.side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; padding: 8px; }
+  nav.side { position: fixed; z-index: 500; left: 0; right: 0; bottom: 0; top: auto; height: auto; flex-direction: row; gap: 0;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--side); box-shadow: 0 -6px 20px -10px rgba(0,0,0,.35); }
+  .brand, nav.side .spacer, nav.side .sep, #focusBtn, #themeToggle, nav.side a[data-nav="suche"], nav.side .nav-kbd { display: none !important; }
+  nav.side a { flex: 1; flex-direction: column; gap: 3px; padding: 6px 2px; font-size: .68rem; border-radius: 10px; justify-content: center; text-align: center; }
+  nav.side a .lbl { display: block; white-space: nowrap; }
+  nav.side a .ic { width: 22px; height: 22px; }
+  nav.side a.active { background: rgba(255,255,255,.1); }
   nav.side a.active::before { display: none; }
-  .brand, nav.side .spacer, nav.side .sep { display: none; }
-  nav.side a .lbl { display: none; }
-  main { padding: 20px 16px 60px; }
+  main { padding: calc(16px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 1.6rem; }
+  input, select, textarea { font-size: 16px; }   /* verhindert Zoomen beim Antippen auf dem iPhone */
+  .toast { bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
+  main .card { padding: 16px; }
+  main .grid.cols-2 { grid-template-columns: 1fr; }
 }
 
 /* Grundbausteine */
@@ -448,3 +458,39 @@ details.fsub { border-left-color: var(--sc) !important; border-left-width: 3px !
 .drill-brief { display: flex; gap: 10px; align-items: flex-start; background: var(--mark-soft); border: 1px solid color-mix(in srgb, var(--mark) 45%, var(--border));
   border-radius: var(--radius-s); padding: 12px 14px; margin-bottom: 14px; font-size: .92rem; }
 .drill-brief .ic { color: var(--warn); margin-top: 3px; }
+
+/* ===== Handy-Kopplung ===== */
+.switch-row { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: .92rem; color: var(--text); cursor: pointer; }
+.switch-row input { width: auto; accent-color: var(--accent); transform: scale(1.2); }
+.phone-pair { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.phone-pair .qr { width: 190px; height: 190px; padding: 10px; background: #fff; border-radius: 14px; border: 1px solid var(--border); flex: none; }
+.phone-pair .qr svg { width: 100%; height: 100%; display: block; }
+.phone-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 46ch; }
+
+/* ===== Handy: Feinschliff ===== */
+@media (max-width: 760px) {
+  .hero { padding: 22px 20px; border-radius: 18px; gap: 14px; }
+  .hero-goal { justify-self: center; }
+  .hero-cta { width: 100%; justify-content: center; }
+  .qcard { padding: 20px 16px 18px; border-radius: 16px; }
+  .qtext { font-size: 1.08rem; }
+  .option { padding: 14px; }
+  .learn-nav { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom)); background: var(--bg); padding: 8px 0; z-index: 10; }
+  .ring-grid { grid-template-columns: 1fr; }
+  details.tree > summary, details.sub > summary { flex-wrap: wrap; }
+  details.tree > summary > .row:last-child, details.sub > summary > .row:last-child { width: 100%; justify-content: flex-start; padding-left: 22px; }
+  details.tree .inner { padding: 0 12px 12px; }
+  .up-form { grid-template-columns: 1fr; }
+  .weak-list > li { padding: 12px; }
+  .dots { gap: 4px; }
+}
+details.upcard > summary { list-style: none; cursor: pointer; }
+details.upcard > summary::-webkit-details-marker { display: none; }
+details.upcard > summary h2 { margin: 0; display: inline-flex; align-items: center; gap: 8px; }
+details.upcard[open] > summary h2 { margin-bottom: .75rem; }
+details.upcard:not([open]) > summary h2::after { content: '+'; color: var(--muted); font-weight: 500; margin-left: 4px; }
+@media (max-width: 760px) {
+  /* Am Handy wird gelernt – Verwalten (Umbenennen, Verschieben, Löschen, Export) bleibt am Mac */
+  #libtree [data-rename], #libtree [data-move], #libtree [data-del], #libtree [data-share], #libtree [data-anki],
+  #libtree [data-frename], #libtree [data-fdel], #libtree .exam-form, #libtree a[href^="/api/pdf"] { display: none !important; }
+}

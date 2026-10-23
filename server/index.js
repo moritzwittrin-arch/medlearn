@@ -10,6 +10,7 @@ import { processDocument, isRunning, generateForTopic, upgradeMatches, upgradeFi
 import { FIG_DIR, applyFiguresToTopic } from './figures.js';
 import { exportPackage, importPackage } from './package.js';
 import { findWeakSpots, createDrill, getDrill } from './weak.js';
+import { remoteGuard, remoteInfo, setRemote, resetRemoteToken, listenHost, isLocal } from './remote.js';
 import { checkUpdate, applyUpdate, restartServer, currentVersion } from './update.js';
 import { review, buildSession, dashboard, hydrate, previewIntervals } from './srs.js';
 import { completeJson, complete, testConnection, aiSettings } from './ai.js';
@@ -19,6 +20,8 @@ import { gradePrompt, tutorPrompt } from './prompts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.disable('x-powered-by');
+app.use(remoteGuard);   // Handy-Zugriff: nur verbundene Geräte (am Mac selbst immer erlaubt)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -425,6 +428,18 @@ app.get('/api/weak', wrap((req) => findWeakSpots({ limit: Number(req.query.limit
 app.post('/api/weak/drill', wrap(async (req) => createDrill(req.body?.topicId, req.body?.unitIds)));
 app.get('/api/drills/:id', wrap((req) => getDrill(req.params.id) || (() => { throw fail('Nicht gefunden', 404); })()));
 
+// ---------- Handy-Zugriff ----------
+app.get('/api/whoami', wrap((req) => ({ local: isLocal(req) })));
+app.get('/api/remote', wrap(async () => ({ ...(await remoteInfo(PORT)), listening: currentHost })));
+app.post('/api/remote', wrap((req) => {
+  const on = !!req.body?.enabled;
+  setRemote(on);
+  const need = on ? '0.0.0.0' : '127.0.0.1';
+  if (need !== currentHost) setTimeout(restartServer, 300);   // Server muss mit neuer Netzwerk-Einstellung neu starten
+  return { ok: true, restarting: need !== currentHost };
+}));
+app.post('/api/remote/reset', wrap(() => { resetRemoteToken(); return { ok: true }; }));
+
 // ---------- Profil (Name für die Begrüßung, Tagesziel) ----------
 app.get('/api/profile', wrap(() => getSetting('profile', { name: '', goal: 50 })));
 app.post('/api/profile', wrap((req) => {
@@ -451,9 +466,10 @@ app.get('/api/backups', wrap(() => ({ dir: BACKUP_DIR, list: listBackups() })));
 app.post('/api/backups', wrap(() => ({ name: createBackup('-manuell') })));
 
 const PORT = Number(process.env.PORT) || 3210;
+const currentHost = listenHost();
 // Beim Neustart nach einem Update kann der alte Prozess den Port noch kurz belegen → einige Sekunden erneut versuchen
 function listen(tries = 0) {
-  const srv = app.listen(PORT, '127.0.0.1', onListening);
+  const srv = app.listen(PORT, currentHost, onListening);
   srv.on('error', (e) => {
     if (e.code === 'EADDRINUSE' && tries < 20) return setTimeout(() => listen(tries + 1), 500);
     if (e.code === 'EADDRINUSE') { console.error(`\n  Port ${PORT} ist belegt – läuft MedLearn schon? Öffne http://localhost:${PORT}\n`); process.exit(1); }

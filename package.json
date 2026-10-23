@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "express": "^4.22.3",
     "multer": "^2.4.0",
     "pdfjs-dist": "^4.10.38",
+    "qrcode": "^1.5.4",
     "ts-fsrs": "^5.4.2"
   },
   "type": "module",
@@ -21,6 +22,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Gezielt üben: Die App erkennt Unterpunkte, die du wiederholt falsch beantwortest, und erstellt dazu ein Mini-Training"
+    "notes": "Am iPhone lernen: Handy-Zugriff im WLAN per QR-Code, App-Symbol für den Home-Bildschirm, Handy-Ansicht mit Tab-Leiste"
   }
 }

@@ -12,9 +12,6 @@ fi
 
 cd "$APP" || exit 1
 mkdir -p data
-LOG="data/server.log"
-# Log klein halten
-if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 5000000 ]; then mv -f "$LOG" "$LOG.alt"; fi
-echo "---- Start $(date) ----" >> "$LOG"
-nohup node --disable-warning=ExperimentalWarning server/index.js >> "$LOG" 2>&1 &
+# Ausgaben schreibt der Server selbst in data/server.log (auch nach Neustarts durch Updates)
+MEDLEARN_LOG="$APP/data/server.log" nohup node --disable-warning=ExperimentalWarning server/index.js >/dev/null 2>&1 &
 # Der Server öffnet den Browser selbst, sobald er bereit ist.

@@ -323,8 +323,8 @@ async function viewLibrary() {
   <div class="row between"><h1>Bibliothek</h1>
     <span class="row" style="gap:8px"><button id="importPkg" title="Ein Lernpaket von Freunden importieren (.medlearn)">${icon('upload', 's')} Lernpaket importieren</button>
       <button id="newFolder">${icon('folderPlus', 's')} Neuer Ordner</button></span></div>
-  <div class="card" style="margin-bottom:20px">
-    <h2>Skript hochladen</h2>
+  <details class="card upcard" style="margin-bottom:20px" ${innerWidth > 760 || !lib.length ? 'open' : ''}>
+    <summary><h2>${icon('upload', 's')} Skript hochladen</h2></summary>
     ${AI_ON ? '' : noAiBox('Das Verarbeiten eigener Skripte')}
     <form id="up" class="grid up-form ${AI_ON ? '' : 'disabled'}">
       <div><label>PDF-Datei</label><input type="file" name="file" accept="application/pdf,.pdf" required></div>
@@ -335,7 +335,7 @@ async function viewLibrary() {
       <datalist id="subjects">${lib.map((s) => `<option value="${esc(s.name)}">`).join('')}</datalist>
     </form>
     <div class="muted small" style="margin-top:8px">Die Analyse läuft im Hintergrund über Claude (dein Abo). Dauer: ca. 1–2 Minuten pro 5 Seiten.</div>
-  </div>
+  </details>
   <div id="libtree"></div>`);
   let timer = null;
   let current = { lib, folders };
@@ -1284,10 +1284,74 @@ async function viewMistakes() {
   $app.querySelectorAll('[data-src]').forEach((a) => a.onclick = (e) => { e.preventDefault(); showSource(a.dataset.src); });
 }
 
+// ---------- Handy-Zugriff (nur am Mac sichtbar) ----------
+async function renderPhoneCard() {
+  const box = document.getElementById('phoneCard'); if (!box) return;
+  let r; try { r = await api('/remote'); } catch (e) { box.innerHTML = `<h2>Am Handy lernen</h2><div class="muted small">${esc(e.message)}</div>`; return; }
+  const live = r.enabled && r.listening === '0.0.0.0';
+  box.innerHTML = `<div class="row between"><h2 style="margin:0">Am Handy lernen</h2>
+      <label class="switch-row"><input type="checkbox" id="phoneOn" ${r.enabled ? 'checked' : ''}> Handy-Zugriff erlauben</label></div>
+    ${!r.enabled ? `<div class="muted small">Damit kannst du MedLearn auf dem iPhone oder iPad nutzen, solange es im <b>selben WLAN</b> wie dein Mac ist und der Mac eingeschaltet ist.
+        Nur Geräte, die du per QR-Code verbindest, kommen hinein.</div>`
+      : !live ? '<div class="small"><span class="spinner"></span> MedLearn startet neu …</div>'
+      : !r.urls.length ? '<div class="small" style="color:var(--bad)">Dein Mac ist gerade mit keinem WLAN verbunden.</div>'
+      : `<div class="phone-pair">
+          <div class="qr">${r.qr}</div>
+          <ol class="phone-steps">
+            <li>iPhone ins <b>selbe WLAN</b> wie den Mac.</li>
+            <li>Mit der <b>Kamera-App</b> den QR-Code scannen und den Link in Safari öffnen.</li>
+            <li>In Safari auf <b>Teilen</b> ${icon('share', 's')} → <b>„Zum Home-Bildschirm“</b> tippen – dann hast du MedLearn als App-Symbol.</li>
+          </ol>
+        </div>
+        <div class="muted small">Adresse im WLAN: <code>${esc(r.urls[0])}</code>${r.urls.length > 1 ? ` (oder ${r.urls.slice(1).map(esc).join(', ')})` : ''}.
+          Fragt dein Mac, ob „node“ eingehende Verbindungen annehmen darf: <b>Erlauben</b>.
+          Im Uni-WLAN klappt die Verbindung oft nicht (Geräte dürfen dort nicht miteinander sprechen) – dann den persönlichen Hotspot des iPhones nutzen und den Mac damit verbinden.</div>
+        <div class="row"><button class="small ghost danger" id="phoneReset" title="Alle verbundenen Handys abmelden und einen neuen QR-Code erzeugen">Neuen Code erzeugen (alle Geräte abmelden)</button></div>`}`;
+  document.getElementById('phoneOn').onchange = async (e) => {
+    e.target.disabled = true;
+    try {
+      const res = await api('/remote', { method: 'POST', body: { enabled: e.target.checked } });
+      if (res.restarting) {
+        box.querySelector('.muted, .small')?.insertAdjacentHTML('beforebegin', '<div class="small"><span class="spinner"></span> MedLearn startet neu …</div>');
+        await new Promise((ok) => setTimeout(ok, 1200));
+        for (let i = 0; i < 30; i++) { if (await api('/version').catch(() => null)) break; await new Promise((ok) => setTimeout(ok, 700)); }
+      }
+    } catch (err) { toast(err.message); }
+    renderPhoneCard();
+  };
+  const rs = document.getElementById('phoneReset');
+  if (rs) rs.onclick = async () => {
+    if (!confirm('Alle verbundenen Handys abmelden? Danach musst du sie mit dem neuen QR-Code neu verbinden.')) return;
+    await api('/remote/reset', { method: 'POST' }); toast('Neuer Code erstellt'); renderPhoneCard();
+  };
+}
+
+// Einstellungen auf dem Handy: nur Profil (KI, Updates & Co. gibt es am Mac)
+function viewSettingsRemote(prof) {
+  setView(`<h1>Einstellungen</h1>
+  <div class="card stack" style="margin-bottom:16px">
+    <h2>Du</h2>
+    <form id="profForm" class="stack">
+      <div><label>Vorname (für die Begrüßung)</label><input name="name" value="${esc(prof.name)}" placeholder="optional" maxlength="40"></div>
+      <div><label>Tagesziel (Antworten)</label><input name="goal" type="number" min="5" max="1000" step="5" value="${prof.goal}"></div>
+      <button class="primary">Speichern</button>
+    </form>
+  </div>
+  <div class="card"><div class="muted small">KI-Anbindung, Updates, Datensicherung und Handy-Zugriff stellst du direkt am Mac ein. Lerndaten liegen auf deinem Mac – das Handy greift im WLAN darauf zu.</div></div>
+  <div class="row" style="margin-top:16px"><button id="themeBtn">${icon('theme', 's')} Hell / Dunkel</button></div>`);
+  document.getElementById('profForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/profile', { method: 'POST', body: { name: e.target.name.value, goal: e.target.goal.value } }); toast('Gespeichert'); }
+    catch (err) { toast(err.message); }
+  };
+  document.getElementById('themeBtn').onclick = () => document.getElementById('themeToggle').click();
+}
+
 // ---------- Einstellungen ----------
 async function viewSettings() {
-  const s = await api('/settings');
   const prof = await api('/profile').catch(() => ({ name: '', goal: 50 }));
+  if (window.IS_LOCAL === false) return viewSettingsRemote(prof);
+  const s = await api('/settings');
   setView(`<h1>Einstellungen</h1>
   <div class="card stack" style="margin-bottom:16px">
     <h2>Du</h2>
@@ -1315,6 +1379,7 @@ async function viewSettings() {
     <div class="muted small">Tipp: „sonnet“ ist der beste Kompromiss aus Qualität und Verbrauch deines Abo-Kontingents. „opus“ liefert die gründlichste Extraktion, verbraucht aber dein Nutzungslimit schneller.</div>
     <div class="row"><button class="primary" id="save">Speichern</button><button id="test">Verbindung testen</button><span id="tres" class="small"></span></div>
   </div>
+  <div class="card stack" style="margin-top:16px" id="phoneCard"></div>
   <div class="card stack" style="margin-top:16px">
     <h2>App</h2>
     <div class="row between"><span>MedLearn <b id="ver">…</b></span>
@@ -1335,6 +1400,7 @@ async function viewSettings() {
       : '<div class="muted">Noch keine Sicherung.</div>');
   };
   loadBackups();
+  renderPhoneCard();
   document.getElementById('profForm').onsubmit = async (e) => {
     e.preventDefault();
     try { await api('/profile', { method: 'POST', body: { name: e.target.name.value, goal: e.target.goal.value } }); toast('Gespeichert'); }
@@ -1681,4 +1747,5 @@ document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); quickSearch(); }
 });
 
-route();
+window.IS_LOCAL = true;
+api('/whoami').then((w) => { window.IS_LOCAL = !!w.local; document.body.classList.toggle('remote', !w.local); }).catch(() => {}).finally(route);
