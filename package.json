@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -23,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Fragen-Umstellung setzt nach erreichtem Nutzungslimit automatisch fort"
+    "notes": "Sicherheit: Schutz vor fremden Webseiten (DNS-Rebinding, Cross-Site-Anfragen)"
   }
 }

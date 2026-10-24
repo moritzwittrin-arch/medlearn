@@ -3,7 +3,7 @@
  * offline aus den Daten, die der Mac über iCloud Drive bereitstellt (MedLearn-Daten.json).
  * Antworten werden lokal gespeichert und als „MedLearn-Fortschritt-….json“ zurück an den Mac gegeben. */
 'use strict';
-const VERSION = '1.7.1';
+const VERSION = '1.7.2';
 const CACHE = `medlearn-shell-${VERSION}`;
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'vendor/fsrs.umd.js'];
 

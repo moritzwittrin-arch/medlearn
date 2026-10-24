@@ -10,7 +10,7 @@ import { processDocument, isRunning, generateForTopic, upgradeMatches, upgradeFi
 import { FIG_DIR, applyFiguresToTopic } from './figures.js';
 import { exportPackage, importPackage } from './package.js';
 import { findWeakSpots, createDrill, getDrill } from './weak.js';
-import { remoteGuard, remoteInfo, setRemote, resetRemoteToken, listenHost, isLocal } from './remote.js';
+import { hostGuard, remoteGuard, remoteInfo, setRemote, resetRemoteToken, listenHost, isLocal } from './remote.js';
 import { mobileStatus, mobileSyncNow, buildPack, importProgress, startMobileSync, MOBILE_URL } from './mobile.js';
 import QRCode from 'qrcode';
 import { checkUpdate, applyUpdate, restartServer, currentVersion } from './update.js';
@@ -23,6 +23,7 @@ import { gradePrompt, tutorPrompt } from './prompts.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.disable('x-powered-by');
+app.use(hostGuard);    // fremde Webseiten / falsche Adressen abweisen
 app.use(remoteGuard);   // Handy-Zugriff: nur verbundene Geräte (am Mac selbst immer erlaubt)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));

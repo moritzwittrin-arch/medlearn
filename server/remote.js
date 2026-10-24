@@ -77,3 +77,34 @@ export function resetRemoteToken() {
   const r = remoteSettings();
   setSetting('remote', { ...r, token: crypto.randomBytes(18).toString('base64url') });
 }
+
+// Schutz gegen fremde Webseiten im eigenen Browser (DNS-Rebinding und Cross-Site-Anfragen):
+// 1. Nur Anfragen an bekannte Adressen (localhost bzw. die eigene WLAN-Adresse bei Handy-Zugriff).
+// 2. Ändernde Anfragen (POST/PUT/DELETE) nur, wenn sie von MedLearn selbst kommen (Origin/Referer = gleiche Adresse).
+let lanCache = { at: 0, hosts: new Set() };
+function allowedHosts() {
+  const base = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+  if (!remoteSettings().enabled) return base;
+  if (Date.now() - lanCache.at > 30000) {
+    const h = new Set(lanAddresses());
+    const name = os.hostname().replace(/\.local$/i, '').toLowerCase();
+    h.add(`${name}.local`); h.add(name);
+    lanCache = { at: Date.now(), hosts: h };
+  }
+  for (const h of lanCache.hosts) base.add(h);
+  return base;
+}
+const hostOnly = (h) => String(h || '').toLowerCase().replace(/:\d+$/, '');
+export function hostGuard(req, res, next) {
+  const host = hostOnly(req.headers.host);
+  if (!allowedHosts().has(host)) return res.status(403).type('text').send('Unbekannte Adresse – MedLearn ist nur über http://localhost:3210 erreichbar.');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    const src = req.headers.origin || req.headers.referer || '';
+    if (src) {
+      let srcHost = '';
+      try { srcHost = new URL(src).host.toLowerCase(); } catch {}
+      if (srcHost !== String(req.headers.host || '').toLowerCase()) return res.status(403).json({ error: 'Anfrage von einer fremden Seite blockiert.' });
+    }
+  }
+  next();
+}
