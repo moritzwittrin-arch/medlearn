@@ -63,24 +63,17 @@ Antworte NUR mit JSON:
 export function generatePrompt({ topic, units, onlyFlashcards = false }) {
   const ul = units.map((u) => `[u${u.id}|S.${u.page}|${u.kind}] ${u.content}`).join('\n');
   const n = units.length;
-  const mcN = Math.max(2, Math.round(n / 3));
   const formats = onlyFlashcards
     ? '{"flashcards":[{"q":"Frage","a":"Antwort","u":[12]}]}'
     : `{
  "flashcards":[{"q":"Frage","a":"Antwort","u":[12]}],
- "cloze":[{"text":"Satz mit {{Lücke}} und {{zweiter Lücke}}","u":[12]}],
- "mc":[{"type":"wissen|klinisch","stem":"Frage/Fallvignette","options":["A","B","C","D","E"],"correct":0,
-        "explanation":"Warum die richtige Antwort stimmt","why_wrong":["leer für richtige Option","warum B falsch","..."],
-        "u":[12],"ki":"optional: ergänzendes Wissen, das NICHT im Skript steht"}],
- "cases":[{"vignette":"Patient ... Symptome ... Untersuchung ... Labor ... Befunde","q":"Was ist die wahrscheinlichste Diagnose?","answer":"...","explanation":"...","u":[12],"ki":"optional"}]
+ "cloze":[{"text":"Satz mit {{Lücke}} und {{zweiter Lücke}}","u":[12]}]
 }`;
   const rules = onlyFlashcards
     ? `Erstelle Karteikarten NUR für die folgenden Wissenseinheiten (jede Einheit mindestens eine Karte).`
-    : `Erstelle aus den Wissenseinheiten Lernmaterial:
+    : `Erstelle aus den Wissenseinheiten Karteikarten für den Anki-Export:
 - flashcards: JEDE Wissenseinheit muss von mindestens einer Karteikarte abgedeckt sein (Abdeckung wird geprüft!). Bei Zahlen/Grenzwerten eigene Karten. Konkrete, prüfungsorientierte Fragen ("Ab welcher LVEF spricht man von HFrEF?"), KEINE generischen Fragen ("Was weißt du über ...?"). Antworten knapp und exakt.
-- cloze: ca. ${Math.max(1, Math.round(n / 5))} Lückentexte für Zahlen, Grenzwerte und Schlüsselbegriffe ({{...}} markiert Lücken).
-- mc: ca. ${mcN} Single-Best-Answer-Fragen mit genau 5 Optionen; Mischung aus Wissensfragen und klinischen Anwendungsfragen (kurze Fallvignette). Die Distraktoren müssen plausibel sein, ähnlich lang und ähnlich aufgebaut wie die richtige Antwort; die richtige Antwort darf nicht durch Länge oder Formulierung erkennbar sein. Position der richtigen Antwort variieren. why_wrong hat genau 5 Einträge (für die richtige Option leerer String).
-- cases: 0–2 klinische Fallvignetten, NUR wenn das Thema klinisch ist (Krankheitsbilder, Diagnostik, Therapie). Sonst leeres Array.`;
+- cloze: ca. ${Math.max(1, Math.round(n / 5))} Lückentexte für Zahlen, Grenzwerte und Schlüsselbegriffe ({{...}} markiert Lücken).`;
   return `Thema: "${topic.chapter} › ${topic.title}"
 
 Wissenseinheiten aus dem Skript (Format: [ID|Seite|Art] Inhalt):
@@ -180,4 +173,32 @@ Regeln:
 ${h ? `Bisheriger Verlauf:\n${h}\n\n` : ''}Student: ${message}
 
 Tutor:`;
+}
+
+/** Quizfragen für die App: ausschließlich Single Choice (eine richtige Antwort) und Multiple Choice (mehrere richtige).
+ *  Jede Wissenseinheit muss von mindestens einer Frage abgedeckt sein. Abbildungen bekommen eigene Bildfragen. */
+export function quizPrompt({ topic, units, figures = [] }) {
+  const ul = units.map((u) => `[u${u.id}|S.${u.page}|${u.kind}] ${u.content}`).join('\n');
+  const fl = figures.map((f) => `[fig${f.id}|S.${f.page}] ${f.title || 'Abbildung'}${f.description ? ` – ${f.description}` : ''}${f.labels?.length ? ` | Beschriftungen: ${f.labels.join(', ')}` : ''}`).join('\n');
+  return `Thema: "${topic.chapter} › ${topic.title}"
+
+Wissenseinheiten aus dem Skript (Format: [ID|Seite|Art] Inhalt):
+${ul}
+${fl ? `\nAbbildungen aus dem Skript (der Student sieht das Bild zur Frage):\n${fl}\n` : ''}
+Erstelle Prüfungsfragen – AUSSCHLIESSLICH in zwei Formaten:
+- "sc" = Single Choice: genau 5 Optionen, genau EINE richtig.
+- "mc" = Multiple Choice: genau 5 Optionen, 2 bis 4 davon richtig (Fragestamm endet mit „(Mehrfachauswahl)“). Etwa jede dritte Frage soll Multiple Choice sein.
+
+Regeln:
+- JEDE Wissenseinheit muss von mindestens einer Frage abgedeckt sein (Abdeckung wird geprüft!). Zahlen, Grenzwerte, Klassifikationen, Leitsymptome, Diagnostik und Therapie gezielt abfragen.
+- Mischung aus Wissensfragen und klinischen Anwendungsfragen (kurze Fallvignette), wie in einer schriftlichen Medizinprüfung.
+- Distraktoren müssen SCHWER sein: aus demselben Themengebiet, fachlich plausibel und für jemanden ohne genaues Wissen glaubhaft (typische Verwechslungen, benachbarte Grenzwerte, ähnliche Krankheitsbilder/Substanzen). KEINE offensichtlich themenfremden oder absurden Optionen. Alle Optionen ähnlich lang und ähnlich aufgebaut – die richtige Antwort darf NICHT die längste oder auffälligste sein. Position der richtigen Antwort(en) variieren.
+- "why": genau 5 Einträge, je ein kurzer Satz mit der medizinischen Begründung, warum die Option richtig bzw. falsch ist (nicht bloß „steht im Skript“).
+${fl ? '- Zu JEDER Abbildung 1–2 Fragen, die man nur mit Blick auf das Bild beantworten kann (z. B. „Welche Struktur ist in der Abbildung mit 3 beschriftet?“, „Welcher Befund ist dargestellt?“) – mit "fig": ID der Abbildung (nur die Zahl). Die Lösung muss sich aus Beschreibung/Beschriftungen ergeben; verrate sie nicht im Fragestamm.\n' : ''}- Die richtigen Antworten müssen sich aus den Wissenseinheiten ergeben (Skript = Referenz). Wissen, das NICHT im Skript steht, nur in das Feld "ki".
+- "u": IDs (nur die Zahl, ohne "u") der zugrunde liegenden Wissenseinheiten.
+- Sprache: Deutsch, medizinische Fachsprache wie im Skript.
+
+Antworte NUR mit JSON:
+{"sc":[{"type":"wissen|klinisch","stem":"…","options":["…","…","…","…","…"],"correct":2,"explanation":"…","why":["…","…","…","…","…"],"u":[12],"ki":"","fig":null}],
+ "mc":[{"type":"wissen|klinisch","stem":"… (Mehrfachauswahl)","options":["…","…","…","…","…"],"correct":[0,3],"explanation":"…","why":["…","…","…","…","…"],"u":[12],"ki":"","fig":null}]}`;
 }

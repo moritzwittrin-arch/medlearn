@@ -1,9 +1,9 @@
 // Verarbeitung: PDF → Seiten → Gliederung → Wissensbasis → Lernmaterial
 import path from 'node:path';
-import { q, one, run, tx, PDF_DIR } from './db.js';
+import { q, one, run, tx, PDF_DIR, setSetting } from './db.js';
 import { extractPdf } from './pdf.js';
 import { completeJson, aiSettings } from './ai.js';
-import { structurePrompt, extractPrompt, generatePrompt, matchPrompt, UNIT_KINDS } from './prompts.js';
+import { structurePrompt, extractPrompt, generatePrompt, matchPrompt, quizPrompt, UNIT_KINDS } from './prompts.js';
 import { processFigures, applyFiguresToTopic } from './figures.js';
 
 const running = new Set();
@@ -213,6 +213,10 @@ async function stepGenerate(docId) {
 async function stepFigures(docId) {
   try {
     await processFigures(docId, (msg, prog) => setStatus(docId, 'abbildungen', 0.9 + 0.1 * (prog || 0), msg));
+    // Bildfragen für Themen mit lernrelevanten Abbildungen
+    const ts = q(`SELECT DISTINCT t.*, c.title chapter FROM topics t JOIN chapters c ON c.id=t.chapter_id JOIN figures f ON f.topic_id=t.id
+      WHERE t.doc_id=? AND f.relevant=1`, docId);
+    await Promise.all(ts.map((t) => generateQuiz(t).catch((e) => console.warn('[Bildfragen]', e.message))));
   } catch (e) {
     // Abbildungen sind ein Zusatz – Fehler hier sollen das Skript nicht blockieren
     console.warn('[Abbildungen]', e.message);
@@ -266,8 +270,82 @@ export async function generateForTopic(topic) {
       tx(() => { for (const f of r.flashcards || []) if (f.q && f.a) save('flashcard', { q: f.q, a: f.a }, f.u); });
     }
   }
-  await generateMatches(topic);
-  applyFiguresToTopic(topic.id);
+  applyFiguresToTopic(topic.id);   // Bildkarten für den Anki-Export
+  await generateQuiz(topic);
+  run("UPDATE topics SET quiz_status='fertig' WHERE id=?", topic.id);
+}
+
+// ---------- Quizfragen für die App: nur Single Choice + Multiple Choice ----------
+// Ergänzt nur, was fehlt: Wissenseinheiten ohne Quizfrage und lernrelevante Abbildungen ohne Bildfrage.
+export async function generateQuiz(topic) {
+  if (aiSettings().provider === 'offline') return 0;
+  const units = q('SELECT * FROM units WHERE topic_id=? ORDER BY ord', topic.id);
+  if (!units.length) return 0;
+  const byId = new Map(units.map((u) => [u.id, u]));
+  const parse = (x, d) => { try { return JSON.parse(x); } catch { return d; } };
+  const quiz = () => q("SELECT data, unit_ids FROM items WHERE topic_id=? AND kind IN ('mc','mcm')", topic.id);
+  const covered = () => new Set(quiz().flatMap((i) => parse(i.unit_ids, [])));
+  const figDone = () => new Set(quiz().map((i) => parse(i.data, {}).fig).filter(Boolean));
+  const figs = q("SELECT id, page, title, description, labels FROM figures WHERE topic_id=? AND relevant=1 AND status='fertig'", topic.id)
+    .map((f) => ({ ...f, labels: parse(f.labels, []) }));
+  const save = (kind, data, uids) => {
+    const ids = (Array.isArray(uids) ? uids : []).map((x) => parseInt(String(x).replace(/\D/g, ''))).filter((x) => byId.has(x));
+    const pages = [...new Set(ids.map((i) => byId.get(i).page))].sort((a, b) => a - b);
+    run('INSERT INTO items(topic_id,doc_id,kind,data,unit_ids,pages) VALUES(?,?,?,?,?,?)',
+      topic.id, topic.doc_id, kind, JSON.stringify(data), JSON.stringify(ids), JSON.stringify(pages));
+  };
+  const figIds = new Set(figs.map((f) => f.id));
+  let added = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    const cov = covered(), fd = figDone();
+    const missing = units.filter((u) => !cov.has(u.id));
+    const figTodo = figs.filter((f) => !fd.has(f.id));
+    if (!missing.length && !figTodo.length) break;
+    const batches = [];
+    for (let i = 0; i < missing.length; i += 25) batches.push(missing.slice(i, i + 25));
+    if (!batches.length) batches.push([]);
+    for (const [bi, b] of batches.entries()) {
+      const r = await completeJson(quizPrompt({ topic, units: b.length ? b : units.slice(0, 25), figures: bi === 0 ? figTodo : [] }));
+      tx(() => {
+        for (const m of [...(r.sc || []), ...(r.mc || [])]) {
+          if (!m.stem || !Array.isArray(m.options) || m.options.length < 4) continue;
+          const n = m.options.length;
+          const corr = [...new Set((Array.isArray(m.correct) ? m.correct : [m.correct]).map(Number).filter((x) => x >= 0 && x < n))].sort((a, b) => a - b);
+          if (!corr.length || corr.length === n) continue;
+          const fig = figIds.has(Number(m.fig)) ? Number(m.fig) : undefined;
+          const base = { type: m.type || 'wissen', stem: m.stem, options: m.options, explanation: m.explanation || '', ki: m.ki || '', ...(fig ? { fig } : {}) };
+          const why = Array.isArray(m.why) ? m.why : Array.isArray(m.why_wrong) ? m.why_wrong : [];
+          if (corr.length === 1) save('mc', { ...base, correct: corr[0], why_wrong: why.map((w, j) => (j === corr[0] ? '' : w)) }, m.u);
+          else save('mcm', { ...base, correct: corr, why }, m.u);
+          added++;
+        }
+      });
+    }
+  }
+  return added;
+}
+
+// Bestehende Skripte im Hintergrund auf das neue Quiz umstellen (einmalig, wird nach Neustart fortgesetzt)
+let quizUpgrading = false;
+export async function upgradeQuiz() {
+  if (quizUpgrading || aiSettings().provider === 'offline') return;
+  quizUpgrading = true;
+  try {
+    const topics = q(`SELECT t.*, c.title chapter FROM topics t JOIN chapters c ON c.id=t.chapter_id JOIN documents d ON d.id=t.doc_id
+      WHERE t.gen_status='fertig' AND t.quiz_status IS NULL AND d.status='fertig' ORDER BY d.id, t.page_from`);
+    if (!topics.length) { setSetting('quizUpgrade', null); return; }
+    const total = one("SELECT COUNT(*) n FROM topics t JOIN documents d ON d.id=t.doc_id WHERE t.gen_status='fertig' AND d.status='fertig'").n;
+    let done = total - topics.length;
+    setSetting('quizUpgrade', { done, total });
+    console.log(`  Quizfragen werden für ${topics.length} Themen ergänzt (Hintergrund) …`);
+    await Promise.all(topics.map(async (t) => {
+      if (running.has(t.doc_id)) return;
+      try { await generateQuiz(t); run("UPDATE topics SET quiz_status='fertig' WHERE id=?", t.id); }
+      catch (e) { console.warn('  Quiz', t.title, e.message); }
+      done++; setSetting('quizUpgrade', { done, total });
+    }));
+    if (!one("SELECT COUNT(*) n FROM topics WHERE quiz_status IS NULL AND gen_status='fertig'").n) setSetting('quizUpgrade', null);
+  } finally { quizUpgrading = false; }
 }
 
 // ---------- Zuordnungsaufgaben (Drag & Drop) ----------
@@ -360,6 +438,9 @@ export async function upgradeFigures() {
       running.add(d.id);
       try {
         await processFigures(d.id, (msg, prog) => run("UPDATE documents SET status='abbildungen', progress=?, message=? WHERE id=?", 0.9 + 0.1 * (prog || 0), msg, d.id));
+        const ts = q(`SELECT DISTINCT t.*, c.title chapter FROM topics t JOIN chapters c ON c.id=t.chapter_id JOIN figures f ON f.topic_id=t.id
+          WHERE t.doc_id=? AND f.relevant=1`, d.id);
+        await Promise.all(ts.map((t) => generateQuiz(t).catch((e) => console.warn('[Bildfragen]', e.message))));
         const n = one("SELECT COUNT(*) n FROM figures WHERE doc_id=? AND relevant=1", d.id).n;
         console.log(`  ✓ ${d.title}: ${n} lernrelevante Abbildungen`);
       } catch (e) { console.warn('  Abbildungen', d.title, e.message); }

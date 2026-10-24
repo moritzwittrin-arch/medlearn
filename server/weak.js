@@ -22,6 +22,7 @@ function questionText(kind, d) {
 }
 function correctText(kind, d) {
   if (kind === 'mc') return d.options?.[d.correct] || '';
+  if (kind === 'mcm') return (d.correct || []).map((i) => d.options?.[i]).filter(Boolean).join('; ');
   if (kind === 'case') return d.answer || '';
   if (kind === 'cloze') return (String(d.text || '').match(/\{\{(.+?)\}\}/g) || []).map((x) => x.slice(2, -2)).join('; ');
   if (kind === 'match') return (d.pairs || []).map((p) => `${p.l} → ${p.r}`).join('; ');
@@ -92,18 +93,17 @@ ${ml}
 Aufgabe:
 1. Finde heraus, was genau er verwechselt oder nicht verstanden hat (z. B. zwei ähnliche Krankheitsbilder, Grenzwerte, Zuordnungen). Benenne es kurz.
 2. Erstelle ein gezieltes Mini-Training, das genau diese Lücke schließt – nicht das ganze Thema:
-   - "cards": 3–4 Kontrast-Karteikarten, die die Unterscheidungsmerkmale direkt gegenüberstellen ("Woran unterscheidest du X von Y?", "Welcher Befund spricht für X statt Y?"). Antworten knapp, gern mit Stichpunkten.
-   - "mc": 2–3 Single-Best-Answer-Fragen mit genau 5 Optionen, die genau die Verwechslung prüfen. Distraktoren plausibel, ähnlich lang und ähnlich aufgebaut wie die richtige Antwort; die richtige Antwort darf nicht die längste sein. why_wrong hat genau 5 Einträge (für die richtige Option leerer String).
-   - "match": 1 Zuordnungsaufgabe mit 3–5 Paaren, die die Merkmale der verwechselten Begriffe gegenüberstellt (nur wenn sinnvoll, sonst leeres Array).
+   - "sc": 4–5 Single-Choice-Fragen (genau 5 Optionen, genau eine richtig), die genau die Verwechslung prüfen – z. B. „Welcher Befund spricht für X und nicht für Y?“, Fallvignetten, die sich nur durch das Unterscheidungsmerkmal lösen lassen.
+   - "mc": 2–3 Multiple-Choice-Fragen (genau 5 Optionen, 2–4 richtig, Stamm endet mit „(Mehrfachauswahl)“), die die Merkmale beider Begriffe gegenüberstellen.
+   - Distraktoren plausibel, ähnlich lang und ähnlich aufgebaut wie die richtigen Antworten; die richtige Antwort darf nicht die längste sein. "why": genau 5 kurze Begründungen (je Option, warum richtig bzw. falsch).
 3. Nutze ausschließlich Inhalte aus den Wissenseinheiten. Wenn ergänzendes Wissen zum Verständnis nötig ist, schreibe es nur in das Feld "ki".
 4. "u" verweist auf die IDs der Wissenseinheiten (Zahl ohne "u").
 
 Antworte NUR mit JSON:
 {"title":"Kurzname der Schwachstelle, max. 60 Zeichen, z. B. Eisenmangelanämie vs. Anämie bei chronischer Entzündung",
  "summary":"2–3 Sätze in Du-Form direkt an den Lernenden (nicht „der Student“): was du verwechselst und woran du es sicher unterscheidest",
- "cards":[{"q":"…","a":"…","u":[1]}],
- "mc":[{"stem":"…","options":["…","…","…","…","…"],"correct":0,"explanation":"…","why_wrong":["","…","…","…","…"],"u":[1],"ki":""}],
- "match":[{"title":"…","pairs":[{"l":"…","r":"…"}],"u":[1]}]}`;
+ "sc":[{"stem":"…","options":["…","…","…","…","…"],"correct":0,"explanation":"…","why":["…","…","…","…","…"],"u":[1],"ki":""}],
+ "mc":[{"stem":"… (Mehrfachauswahl)","options":["…","…","…","…","…"],"correct":[1,3],"explanation":"…","why":["…","…","…","…","…"],"u":[1],"ki":""}]}`;
 }
 
 /** Mini-Training für ein Schwachstellen-Cluster erstellen (oder vorhandenes zurückgeben). */
@@ -134,7 +134,7 @@ export async function createDrill(topicId, unitIds) {
   if (aiSettings().provider !== 'offline') {
     const mistakes = wrongItems.slice(0, 8).map((i) => {
       const d = parse(i.data, {});
-      return { q: questionText(i.kind, d), given: i.kind === 'mc' ? i.last_answer : '', right: correctText(i.kind, d) };
+      return { q: questionText(i.kind, d), given: ['mc', 'mcm'].includes(i.kind) ? i.last_answer : '', right: correctText(i.kind, d) };
     });
     const r = await completeJson(drillPrompt({ topic: topic.title, units, mistakes }));
     title = String(r.title || topic.title).slice(0, 80);
@@ -147,15 +147,15 @@ export async function createDrill(topicId, unitIds) {
         topicId, topic.doc_id, kind, JSON.stringify(data), JSON.stringify(use), JSON.stringify(pages)).lastInsertRowid));
     };
     tx(() => {
-      for (const c of r.cards || []) if (c.q && c.a) save('flashcard', { q: c.q, a: c.a, drill: true }, c.u);
-      for (const m of r.mc || []) {
-        const correct = Number(m.correct);
-        if (!m.stem || !Array.isArray(m.options) || m.options.length < 4 || !(correct >= 0 && correct < m.options.length)) continue;
-        save('mc', { type: 'wissen', stem: m.stem, options: m.options, correct, explanation: m.explanation || '', why_wrong: m.why_wrong || [], ki: m.ki || '', drill: true }, m.u);
-      }
-      for (const mt of r.match || []) {
-        const pairs = (mt.pairs || []).filter((p) => p.l && p.r);
-        if (pairs.length >= 3) save('match', { title: mt.title || 'Ordne zu', pairs: pairs.slice(0, 6), drill: true }, mt.u);
+      for (const m of [...(r.sc || []), ...(r.mc || [])]) {
+        if (!m.stem || !Array.isArray(m.options) || m.options.length < 4) continue;
+        const n = m.options.length;
+        const corr = [...new Set((Array.isArray(m.correct) ? m.correct : [m.correct]).map(Number).filter((x) => x >= 0 && x < n))].sort((a, b) => a - b);
+        if (!corr.length || corr.length === n) continue;
+        const why = Array.isArray(m.why) ? m.why : Array.isArray(m.why_wrong) ? m.why_wrong : [];
+        const base = { type: 'wissen', stem: m.stem, options: m.options, explanation: m.explanation || '', ki: m.ki || '', drill: true };
+        if (corr.length === 1) save('mc', { ...base, correct: corr[0], why_wrong: why.map((w, k) => (k === corr[0] ? '' : w)) }, m.u);
+        else save('mcm', { ...base, correct: corr, why }, m.u);
       }
     });
   }

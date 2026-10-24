@@ -96,7 +96,7 @@ export function buildSession({ scope, mode = 'mixed', size } = {}) {
   const { sql, params } = scopeSql(scope);
   const now = nowIso();
   const focused = scope && scope.type && scope.type !== 'all';
-  const kindsFor = { flashcards: ['flashcard', 'cloze'], mc: ['mc', 'case'], match: ['match'] };
+  const kindsFor = {};   // nur noch Quizfragen: alle Modi lernen Single + Multiple Choice
   const kindFilter = (kinds) => `i.kind IN (${kinds.map((k) => `'${k}'`).join(',')})`;
 
   // Ganzes Fach / ganzer Ordner: eine große Abfrage mit ALLEN Lerninhalten, durchgemischt (wie bei Medibk+)
@@ -108,7 +108,7 @@ export function buildSession({ scope, mode = 'mixed', size } = {}) {
     return shuffle(hydrate(rows));
   }
 
-  const kinds = kindsFor[mode] || ['flashcard', 'cloze', 'mc', 'case', 'match'];
+  const kinds = kindsFor[mode] || ['mc', 'mcm'];
   if (full) return shuffle(hydrate(q(`${ITEM_SELECT} WHERE ${sql} AND ${ITEM_OK} AND ${kindFilter(kinds)}`, ...params)));
   const due = q(`${ITEM_SELECT} WHERE ${sql} AND ${ITEM_OK} AND ${kindFilter(kinds)} AND st.due <= ?
                  ORDER BY st.lapses DESC, st.due ASC LIMIT ?`, ...params, now, size || (focused ? 40 : 20));
@@ -119,7 +119,7 @@ export function buildSession({ scope, mode = 'mixed', size } = {}) {
   let fresh = [];
   if (mode === 'mixed') {
     const f = focused ? 12 : 6;
-    fresh = [...takeNew(['flashcard', 'cloze'], f), ...takeNew(['mc', 'case'], focused ? 6 : 5), ...takeNew(['match'], focused ? 2 : 1)];
+    fresh = takeNew(['mc', 'mcm'], focused ? 20 : 12);
   } else {
     fresh = takeNew(kinds, size || 15);
   }
@@ -144,12 +144,12 @@ export function dashboard() {
   const todayIso = today.toISOString().replace('T', ' ').slice(0, 19);
   const due = one(`SELECT
       SUM(CASE WHEN i.kind IN ('flashcard','cloze') THEN 1 ELSE 0 END) cards,
-      SUM(CASE WHEN i.kind IN ('mc','case') THEN 1 ELSE 0 END) mc,
+      SUM(CASE WHEN i.kind IN ('mc','mcm','case') THEN 1 ELSE 0 END) mc,
       SUM(CASE WHEN i.kind='match' THEN 1 ELSE 0 END) mt
       FROM items i JOIN item_state st ON st.item_id=i.id WHERE ${ITEM_OK} AND st.due <= ?`, now);
   const fresh = one(`SELECT
       SUM(CASE WHEN i.kind IN ('flashcard','cloze') THEN 1 ELSE 0 END) cards,
-      SUM(CASE WHEN i.kind IN ('mc','case') THEN 1 ELSE 0 END) mc,
+      SUM(CASE WHEN i.kind IN ('mc','mcm','case') THEN 1 ELSE 0 END) mc,
       SUM(CASE WHEN i.kind='match' THEN 1 ELSE 0 END) mt
       FROM items i LEFT JOIN item_state st ON st.item_id=i.id WHERE ${ITEM_OK} AND st.item_id IS NULL`);
   const todayStats = one(`SELECT COUNT(*) n, SUM(correct) ok, COUNT(DISTINCT item_id) items FROM review_log WHERE ts >= ?`, todayIso);
@@ -189,6 +189,7 @@ export function dashboard() {
     subjects: subjects.map((s) => ({ ...s, pct: s.total ? Math.round(100 * (s.known || 0) / s.total) : 0 })),
     folders,
     profile: getSetting('profile', { name: '', goal: 50 }),
+    quizUpgrade: getSetting('quizUpgrade', null),
     weak, recent, processing, activity, exams,
     openMistakes: one('SELECT COUNT(*) n FROM mistakes WHERE resolved=0').n,
   };

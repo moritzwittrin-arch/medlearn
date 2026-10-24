@@ -110,6 +110,13 @@ function toNote(it, media) {
          ${d.explanation ? `<p>${esc(d.explanation)}</p>` : ''}
          ${(d.why_wrong || []).some(Boolean) ? `<ul class="opts why">${d.options.map((o, k) => (k !== d.correct && d.why_wrong[k] ? `<li><b>${letters[k]}</b>: ${esc(d.why_wrong[k])}</li>` : '')).join('')}</ul>` : ''}
          ${ki(d.ki)}${back}`] };
+    case 'mcm':
+      return { model: MODEL_BASIC, fields: [
+        `${esc(d.stem)}<ul class="opts">${d.options.map((o, k) => `<li><b>${letters[k]}</b>&nbsp; ${esc(o)}</li>`).join('')}</ul>`,
+        `<div class="ok">${(d.correct || []).map((k) => `${letters[k]}: ${esc(d.options[k])}`).join('<br>')}</div>
+         ${d.explanation ? `<p>${esc(d.explanation)}</p>` : ''}
+         ${(d.why || []).some(Boolean) ? `<ul class="opts why">${d.options.map((o, k) => (d.why[k] ? `<li><b>${letters[k]}</b>: ${esc(d.why[k])}</li>` : '')).join('')}</ul>` : ''}
+         ${ki(d.ki)}${back}`] };
     case 'case':
       return { model: MODEL_BASIC, fields: [`${esc(d.vignette)}<br><br><b>${esc(d.q)}</b>`,
         `<b>${esc(d.answer)}</b>${d.explanation ? `<p>${esc(d.explanation)}</p>` : ''}${ki(d.ki)}${back}`] };
@@ -129,6 +136,7 @@ export function buildApkg({ scope, kinds, compact = false }) {
   // Kompakt: kinds = nur die angehakten Extras (leer = keine Extras); sonst leer = alles
   let allowed = (kinds && (kinds.length || compact) ? kinds : ['flashcard', 'cloze', 'mc', 'case', 'match'])
     .filter((k) => ['flashcard', 'cloze', 'mc', 'case', 'match'].includes(k));
+  if (allowed.includes('mc')) allowed.push('mcm');   // MC-Fragen im Export = Single + Multiple Choice
   // Kompakt: Karteikarten + Lückentexte kommen verdichtet aus dem Kompakt-Speicher
   const compactPart = compact ? compactRows(scope) : [];
   if (compact) allowed = allowed.filter((k) => !['flashcard', 'cloze'].includes(k));

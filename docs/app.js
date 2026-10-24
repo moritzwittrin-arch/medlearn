@@ -87,7 +87,7 @@ function md(text) {
   if (inList) html += `</${inList}>`;
   return html;
 }
-const KIND_LABEL = { flashcard: 'Karteikarte', cloze: 'Lückentext', mc: 'Multiple Choice', case: 'Klinischer Fall', match: 'Zuordnung', open: 'Freitext' };
+const KIND_LABEL = { mc: 'Single Choice', mcm: 'Multiple Choice', flashcard: 'Karteikarte', cloze: 'Lückentext', case: 'Klinischer Fall', match: 'Zuordnung', open: 'Freitext' };
 function shuffleIdx(n) { const a = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const pagesLabel = (p) => (p && p.length ? `S. ${p.join(', ')}` : 'S. ?');
 function parseHash() {
@@ -255,7 +255,7 @@ async function viewDashboard(soft = false) {
   const totalNew = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const hasContent = d.subjects.length > 0;
   setView(`
-  ${banner}${heroCard(d)}
+  ${banner}${d.quizUpgrade && d.quizUpgrade.done < d.quizUpgrade.total ? `<div class="card sync-banner small-b"><span><b>Deine Fragen werden auf Single &amp; Multiple Choice umgestellt</b> – ${d.quizUpgrade.done} von ${d.quizUpgrade.total} Themen fertig. Läuft im Hintergrund weiter, auch nach einem Neustart.</span></div>` : ''}${heroCard(d)}
   ${d.processing.map((p) => `
     <div class="card" style="margin-bottom:16px">
       <div class="row between"><b class="row" style="gap:8px">${icon('file')} ${esc(p.title)}</b>
@@ -635,14 +635,11 @@ async function viewTopic(id) {
   <h1>${esc(t.title)}</h1>
   <div class="row" style="margin-bottom:16px">
     <a class="btn primary" href="#/lernen?scope=topic:${t.id}">${icon('play')} Thema lernen</a>
-    <a class="btn" href="#/lernen?scope=topic:${t.id}&mode=flashcards">Nur Karten</a>
-    <a class="btn" href="#/lernen?scope=topic:${t.id}&mode=mc">Nur MC</a>
-    <a class="btn" href="#/lernen?scope=topic:${t.id}&mode=match">Nur Zuordnung</a>
     <a class="btn" href="#/tutor?topic=${t.id}">${icon('chat')} Tutor fragen</a>
     <a class="btn" href="api/pdf/${t.doc_id}#page=${t.page_from}" target="_blank">${icon('external')} PDF, Seite ${t.page_from}</a>
   </div>
   <div class="grid stats" style="margin-bottom:16px">
-    ${['flashcard', 'cloze', 'mc', 'case', 'match'].map((k) => `<div class="card stat"><div class="num">${counts[k] || 0}</div><div class="lbl">${KIND_LABEL[k]}</div></div>`).join('')}
+    ${['mc', 'mcm'].map((k) => `<div class="card stat"><div class="num">${counts[k] || 0}</div><div class="lbl">${KIND_LABEL[k]}</div></div>`).join('')}
   </div>
   ${t.suspended ? `<div class="card row between" style="margin-bottom:16px"><span class="muted">${t.suspended} ausgeblendete${t.suspended === 1 ? 'r' : ''} Lerninhalt${t.suspended === 1 ? '' : 'e'}</span><button class="small" id="unsusp">Wieder einblenden</button></div>` : ''}
   ${t.mistakes.length ? `<div class="card" style="margin-bottom:16px"><h3>Offene Fehler</h3><ul class="list">${t.mistakes.map((m) => `<li>${esc(m.description)}</li>`).join('')}</ul></div>` : ''}
@@ -875,7 +872,7 @@ async function viewLearn(params) {
   }
   const doneNote = (d) => `<div class="done-note ${d.correct ? 'good' : 'bad'}">${icon(d.correct ? 'check' : 'x', 's')} Beantwortet – Bewertung: <b>${RATE_LBL[d.rating - 1]}</b>
     <span class="muted small">(zählt für die Wiederholung; zum Ändern die Frage später erneut lernen)</span></div>`;
-  const head = (item) => `<div class="kind"><span class="subj-pill">${esc(item.source.subject)}</span>${item.data.fig ? 'Bildkarte' : KIND_LABEL[item.kind]} ${item.isNew ? '<span class="tag accent">neu</span>' : ''}
+  const head = (item) => `<div class="kind"><span class="subj-pill">${esc(item.source.subject)}</span>${KIND_LABEL[item.kind]}${item.data.fig ? ' mit Bild' : ''} ${item.isNew ? '<span class="tag accent">neu</span>' : ''}
     ${item.lapses || item.wrong ? `<span class="tag bad">${item.wrong || item.lapses}× falsch</span>` : ''}
     ${item.data.type === 'klinisch' ? '<span class="tag">klinisch</span>' : ''}</div>`;
   const kiBox = (t) => (t ? `<div class="ai-box">${KI_LABEL} <span class="muted small">– nicht aus deinem Skript</span><div style="margin-top:4px">${esc(t)}</div></div>` : '');
@@ -924,7 +921,7 @@ async function viewLearn(params) {
     const d = S.done[item.id] || null;
     const p = d ? null : S.pending[item.id] || null;
     if (d?.suspended) return renderSuspended(item, d);
-    ({ flashcard: renderFlash, cloze: renderCloze, mc: renderMc, case: renderCase, match: renderMatch }[item.kind] || renderFlash)(item, d, p);
+    ({ flashcard: renderFlash, cloze: renderCloze, mc: renderMc, mcm: renderMcm, case: renderCase, match: renderMatch }[item.kind] || renderMc)(item, d, p);
     window.scrollTo(0, 0);
   }
 
@@ -972,7 +969,7 @@ async function viewLearn(params) {
   function renderMc(item, d, p) {
     const q = item.data;
     const letters = 'ABCDEFG';
-    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}<div class="qtext">${esc(q.stem)}</div>
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}${q.fig ? figFront(q.fig) : ''}<div class="qtext">${esc(q.stem)}</div>
       <div class="options">${q.options.map((o, k) => `<button class="option" data-opt="${k}"><span class="key">${letters[k]}</span><span class="option-body">${esc(o)}<span class="why"></span></span></button>`).join('')}</div>
       <div id="res"></div>${sourceRow(item)}</div>`;
     bindCommon(item);
@@ -989,7 +986,7 @@ async function viewLearn(params) {
       });
       const res = document.getElementById('res');
       res.innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${ok ? icon('check') + ' Richtig' : `${icon('x')} Falsch – richtig ist ${letters[q.correct]}`}</div>
-        ${q.explanation ? `<div class="explain"><b>Erklärung:</b> ${esc(q.explanation)}</div>` : ''}${kiBox(q.ki)}${figStrip(item)}
+        ${q.explanation ? `<div class="explain"><b>Erklärung:</b> ${esc(q.explanation)}</div>` : ''}${q.fig ? figNote(q.fig) : ''}${kiBox(q.ki)}${figStrip(item)}
         <div class="row" style="margin-top:18px" id="mcact">${d ? doneNote(d) : ok
           ? `<span class="muted small">Wie sicher warst du?</span>
              <button data-r="2">Geraten/unsicher <span class="kbd">1</span></button>
@@ -1019,6 +1016,70 @@ async function viewLearn(params) {
       const n = ['1', '2', '3', '4', '5'].indexOf(e.key);
       const idx = k >= 0 && k < q.options.length ? k : n >= 0 && n < q.options.length ? n : -1;
       if (idx >= 0) choose(idx);
+    };
+  }
+
+  // Multiple Choice: mehrere richtige Antworten – ankreuzen, dann prüfen (nur ganz richtig zählt als richtig)
+  function renderMcm(item, d, p) {
+    const q = item.data;
+    const letters = 'ABCDEFG';
+    const correct = new Set(q.correct || []);
+    stage().innerHTML = `<div class="qcard" style="--sc:${subjColor(item.source.subject)}">${head(item)}${q.fig ? figFront(q.fig) : ''}<div class="qtext">${esc(q.stem)}</div>
+      <div class="muted small" style="margin-top:6px">Mehrere Antworten sind richtig – alle zutreffenden ankreuzen.</div>
+      <div class="options multi">${q.options.map((o, k) => `<button class="option" data-opt="${k}" aria-pressed="false"><span class="key box">${letters[k]}</span><span class="option-body">${esc(o)}<span class="why"></span></span></button>`).join('')}</div>
+      <div id="act" style="margin-top:16px"><button class="primary" id="check" disabled>Prüfen <span class="kbd">Enter</span></button></div>
+      <div id="res"></div>${sourceRow(item)}</div>`;
+    bindCommon(item);
+    const sel = new Set();
+    const btns = [...stage().querySelectorAll('[data-opt]')];
+    const sync = () => {
+      btns.forEach((b) => { const on = sel.has(Number(b.dataset.opt)); b.classList.toggle('picked', on); b.setAttribute('aria-pressed', on); });
+      const c = document.getElementById('check'); if (c) c.disabled = !sel.size;
+    };
+    const check = (picked, fromSaved = false) => {
+      keyHandler = null;
+      const ok = picked.size === correct.size && [...picked].every((x) => correct.has(x));
+      btns.forEach((b) => {
+        const j = Number(b.dataset.opt);
+        b.disabled = true; b.style.opacity = 1; b.classList.remove('picked');
+        if (correct.has(j) && picked.has(j)) b.classList.add('correct');
+        else if (correct.has(j)) b.classList.add('missed');
+        else if (picked.has(j)) b.classList.add('wrong');
+        const why = q.why?.[j]; if (why) b.querySelector('.why').textContent = why;
+      });
+      document.getElementById('act').innerHTML = '';
+      const right = [...correct].map((x) => letters[x]).join(', ');
+      const res = document.getElementById('res');
+      res.innerHTML = `<div class="verdict ${ok ? 'good' : 'bad'}">${ok ? icon('check') + ' Richtig' : `${icon('x')} Nicht ganz – richtig sind ${right}`}</div>
+        ${q.explanation ? `<div class="explain"><b>Erklärung:</b> ${esc(q.explanation)}</div>` : ''}${q.fig ? figNote(q.fig) : ''}${kiBox(q.ki)}${figStrip(item)}
+        <div class="row" style="margin-top:18px">${d ? doneNote(d) : ok
+          ? `<span class="muted small">Wie sicher warst du?</span>
+             <button data-r="2">Geraten/unsicher <span class="kbd">1</span></button>
+             <button class="primary" data-r="3">Sicher <span class="kbd">2</span></button>
+             <button data-r="4">Sehr leicht <span class="kbd">3</span></button>`
+          : `<button class="primary" data-r="1">Weiter <span class="kbd">Enter</span></button>`}</div>`;
+      if (d) return;
+      if (!fromSaved || !p?.checked) setPending(item, { sel: [...picked], checked: true });
+      const chosen = [...picked].sort().map((x) => q.options[x]);
+      const mistake = ok ? null : `${q.stem.slice(0, 140)}${q.stem.length > 140 ? '…' : ''} — angekreuzt: ${chosen.map((x) => `„${x}“`).join(', ') || '–'}; richtig: ${[...correct].map((x) => `„${q.options[x]}“`).join(', ')}`;
+      const goR = (r) => answer(item, r, { correct: ok, answer: chosen.join(' | '), mistake }, { sel: [...picked] });
+      res.querySelectorAll('[data-r]').forEach((b) => b.onclick = () => goR(Number(b.dataset.r)));
+      keyHandler = (e) => {
+        if (!ok && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goR(1); }
+        if (ok && ['1', '2', '3'].includes(e.key)) goR(Number(e.key) + 1);
+      };
+    };
+    const prev = d?.v?.sel ?? (p?.checked ? p.sel : null);
+    if (prev) return check(new Set(prev), true);
+    if (d) { btns.forEach((b) => { b.disabled = true; if (correct.has(Number(b.dataset.opt))) b.classList.add('correct'); }); document.getElementById('act').innerHTML = ''; document.getElementById('res').innerHTML = doneNote(d); return; }
+    btns.forEach((b) => b.onclick = () => { const j = Number(b.dataset.opt); sel.has(j) ? sel.delete(j) : sel.add(j); sync(); });
+    document.getElementById('check').onclick = () => check(new Set(sel));
+    keyHandler = (e) => {
+      if (e.key === 'Enter' && sel.size) { e.preventDefault(); return check(new Set(sel)); }
+      const k = letters.indexOf(e.key.toUpperCase());
+      const n = ['1', '2', '3', '4', '5'].indexOf(e.key);
+      const idx = k >= 0 && k < q.options.length ? k : n >= 0 && n < q.options.length ? n : -1;
+      if (idx >= 0) { sel.has(idx) ? sel.delete(idx) : sel.add(idx); sync(); }
     };
   }
 

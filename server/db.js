@@ -132,9 +132,12 @@ addColumn('documents', 'figures_status', 'TEXT');        // Abbildungen verarbei
 // Ordner in der Bibliothek (z. B. pro Prüfung); Skripte ohne Ordner haben folder_id NULL
 db.exec(`CREATE TABLE IF NOT EXISTS folders (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))`);
 addColumn('documents', 'folder_id', 'INTEGER');
+addColumn('topics', 'quiz_status', 'TEXT');   // Quizfragen (SC/MC) vollständig?
 
 // Lerninhalte, die in Sessions/Statistik zählen (Freitext-Fragen sind deaktiviert)
-export const ACTIVE_KINDS = ['flashcard', 'cloze', 'mc', 'case', 'match'];
+// Im Quiz der App gibt es nur noch Single Choice („mc“) und Multiple Choice („mcm“), auch mit Bild.
+// Karteikarten, Lückentexte, Fälle und Zuordnungen bleiben gespeichert – nur noch für den Anki-Export.
+export const ACTIVE_KINDS = ['mc', 'mcm'];
 export const ITEM_OK = `i.suspended = 0 AND i.kind IN (${ACTIVE_KINDS.map((k) => `'${k}'`).join(',')})`;
 
 // ---------- Backups ----------

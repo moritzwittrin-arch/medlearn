@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -23,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "iPhone: Datendatei viel kleiner (Bilder verkleinert), Laden auch großer Datenmengen"
+    "notes": "Quiz nur noch mit Single- und Multiple-Choice-Fragen (auch mit Bildern); bestehende Skripte werden im Hintergrund umgestellt"
   }
 }

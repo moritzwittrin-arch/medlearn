@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { q, one, run, tx, PDF_DIR, getSetting, setSetting, ITEM_OK, createBackup, listBackups, BACKUP_DIR } from './db.js';
-import { processDocument, isRunning, generateForTopic, upgradeMatches, upgradeFigures } from './pipeline.js';
+import { processDocument, isRunning, generateForTopic, upgradeMatches, upgradeFigures, upgradeQuiz } from './pipeline.js';
 import { FIG_DIR, applyFiguresToTopic } from './figures.js';
 import { exportPackage, importPackage } from './package.js';
 import { findWeakSpots, createDrill, getDrill } from './weak.js';
@@ -505,5 +505,6 @@ function onListening() {
   }
   startMobileSync();   // iPhone-App: Lernstand in iCloud Drive aktuell halten, Antworten vom iPhone übernehmen
   // ältere Skripte im Hintergrund um Zuordnungsaufgaben ergänzen
-  setTimeout(() => upgradeMatches().catch((e) => console.warn(e.message)).finally(() => upgradeFigures().catch((e) => console.warn(e.message))), 3000);
+  // Abbildungen nachrüsten, dann bestehende Themen auf das neue Quiz (nur Single/Multiple Choice) umstellen
+  setTimeout(() => upgradeFigures().catch((e) => console.warn(e.message)).finally(() => upgradeQuiz().catch((e) => console.warn(e.message))), 3000);
 }

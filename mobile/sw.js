@@ -73,7 +73,7 @@ function build(pack, log, sessions, profile, resolved, suspended, meta) {
 }
 const st = (id) => D.states[id] || null;
 const okItem = (it) => it && !D.suspended.has(it.id);
-const activeItems = () => D.P.items.filter(okItem);
+const activeItems = () => D.P.items.filter((it) => okItem(it) && (it.kind === 'mc' || it.kind === 'mcm'));
 
 function applyReview(d, r) {
   const it = d.items.get(r.itemId); if (!it) return null;
@@ -137,14 +137,14 @@ function buildSession({ scope, mode = 'mixed', size } = {}) {
   const f = inScope(scope);
   const focused = scope && scope.type && scope.type !== 'all';
   const full = ['subject', 'folder', 'drill'].includes(scope?.type);
-  const kindsFor = { flashcards: ['flashcard', 'cloze'], mc: ['mc', 'case'], match: ['match'] };
+  const kindsFor = {};   // nur Single + Multiple Choice
   const pool = activeItems().filter(f);
   if (mode === 'mistakes') {
     const ids = new Set(openMistakes().map((m) => m.item_id));
     const rows = pool.filter((it) => ids.has(it.id)).sort((a, b) => (st(b.id)?.wrong || 0) - (st(a.id)?.wrong || 0));
     return shuffle((full ? rows : rows.slice(0, 30)).map(hydrate));
   }
-  const kinds = kindsFor[mode] || ['flashcard', 'cloze', 'mc', 'case', 'match'];
+  const kinds = kindsFor[mode] || ['mc', 'mcm'];
   const pk = pool.filter((it) => kinds.includes(it.kind));
   if (full) return shuffle(pk.map(hydrate));
   const now = new Date().toISOString();
@@ -155,7 +155,7 @@ function buildSession({ scope, mode = 'mixed', size } = {}) {
     || ((D.topics.get(a.topic_id)?.ord || 0) - (D.topics.get(b.topic_id)?.ord || 0)) || (a.id - b.id);
   const takeNew = (ks, n) => (n > 0 ? pool.filter((it) => ks.includes(it.kind) && !st(it.id)).sort(order).slice(0, n) : []);
   let fresh;
-  if (mode === 'mixed') fresh = [...takeNew(['flashcard', 'cloze'], focused ? 12 : 6), ...takeNew(['mc', 'case'], focused ? 6 : 5), ...takeNew(['match'], focused ? 2 : 1)];
+  if (mode === 'mixed') fresh = takeNew(['mc', 'mcm'], focused ? 20 : 12);
   else fresh = takeNew(kinds, size || 15);
   const ids = new Set([...due, ...fresh].map((r) => r.id));
   const mids = new Set(openMistakes().map((m) => m.item_id));
