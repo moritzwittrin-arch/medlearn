@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -23,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "iPhone: Datei-Auswahl für MedLearn-Daten.json repariert"
+    "notes": "iPhone: Datendatei viel kleiner (Bilder verkleinert), Laden auch großer Datenmengen"
   }
 }

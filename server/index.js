@@ -444,12 +444,12 @@ app.post('/api/remote/reset', wrap(() => { resetRemoteToken(); return { ok: true
 
 // ---------- iPhone-App (offline, Abgleich über iCloud Drive) ----------
 app.get('/api/mobile/status', wrap(async () => ({ ...mobileStatus(), qr: await QRCode.toString(MOBILE_URL, { type: 'svg', margin: 1 }) })));
-app.post('/api/mobile/sync', wrap(() => mobileSyncNow()));
-app.get('/api/mobile/pack', (req, res) => {
+app.post('/api/mobile/sync', wrap(async () => mobileSyncNow()));
+app.get('/api/mobile/pack', async (req, res) => {
   try {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="MedLearn-Daten.json"');
-    res.end(JSON.stringify(buildPack()));
+    res.end(JSON.stringify(await buildPack()));
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
 });
 const jsonUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });

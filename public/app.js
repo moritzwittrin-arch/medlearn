@@ -1409,9 +1409,12 @@ async function renderSyncCard() {
     msg.innerHTML = `<span class="spinner"></span> „${esc(f.name)}“ wird geladen …`;
     try {
       const text = await f.text();
-      let pack;
-      try { pack = JSON.parse(text); } catch { throw new Error(`„${f.name}“ ist keine MedLearn-Datendatei. Bitte „MedLearn-Daten.json“ aus iCloud Drive › MedLearn wählen.`); }
-      const r = await api('/mobile/import', { method: 'POST', body: pack });
+      if (!/^\s*\{/.test(text.slice(0, 50))) throw new Error(`„${f.name}“ ist keine MedLearn-Datendatei. Bitte „MedLearn-Daten.json“ aus iCloud Drive › MedLearn wählen.`);
+      msg.innerHTML = `<span class="spinner"></span> ${(f.size / 1048576).toFixed(0)} MB werden gespeichert …`;
+      // Text direkt weiterreichen (nicht erst zerlegen und neu zusammensetzen) – spart auf dem iPhone viel Speicher
+      const res = await fetch('api/mobile/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: text });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.error || `Fehler ${res.status}`);
       toast(`Geladen: ${r.items} Lerninhalte (Stand ${fmtWhen(r.created)})`, 4500);
       renderSyncCard();
     } catch (err) { msg.innerHTML = `<span style="color:var(--bad)">${esc(err.message || 'Datei konnte nicht gelesen werden')}</span>`; input.value = ''; }

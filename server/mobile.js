@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { db, q, one, run, ITEM_OK, getSetting, setSetting } from './db.js';
+import { db, q, one, run, ITEM_OK, getSetting, setSetting, DATA_DIR } from './db.js';
 import { FIG_DIR } from './figures.js';
 import { review } from './srs.js';
 import { findWeakSpots } from './weak.js';
@@ -29,8 +29,34 @@ const icloudDir = () => { const r = icloudRoot(); return r ? path.join(r, 'MedLe
 
 const parse = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 
+// Abbildungen fürs iPhone verkleinern (max. 800 px, WebP) – sonst wird die Datei viel zu groß. Ergebnis wird zwischengespeichert.
+const IMG_CACHE = path.join(DATA_DIR, 'mobile-img');
+let canvasMod;
+async function phoneImage(f) {
+  const src = path.join(FIG_DIR, String(f.doc_id), f.file);
+  let stat; try { stat = fs.statSync(src); } catch { return null; }
+  const cached = path.join(IMG_CACHE, `${f.id}-${Math.round(stat.mtimeMs)}.webp`);
+  try { return { data: fs.readFileSync(cached).toString('base64'), mime: 'image/webp' }; } catch {}
+  try {
+    canvasMod = canvasMod || await import('@napi-rs/canvas');
+    const img = await canvasMod.loadImage(fs.readFileSync(src));
+    const k = Math.min(1, 800 / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+    const c = canvasMod.createCanvas(w, h); const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+    const buf = await c.encode('webp', 62);
+    fs.mkdirSync(IMG_CACHE, { recursive: true });
+    for (const old of fs.readdirSync(IMG_CACHE)) if (old.startsWith(`${f.id}-`)) fs.rmSync(path.join(IMG_CACHE, old), { force: true });
+    fs.writeFileSync(cached, buf);
+    return { data: buf.toString('base64'), mime: 'image/webp' };
+  } catch {
+    // ohne Bildbibliothek: Original nur nehmen, wenn es klein genug ist
+    return stat.size < 150 * 1024 ? { data: fs.readFileSync(src).toString('base64'), mime: 'image/png' } : null;
+  }
+}
+
 /** Kompletter Lernstand für das iPhone (ohne Lernfortschritt-Historie, aber mit Kartenzuständen). */
-export function buildPack() {
+export async function buildPack() {
   const items = q(`SELECT id, topic_id, doc_id, kind, data, unit_ids, pages FROM items i WHERE ${ITEM_OK}`)
     .map((i) => ({ ...i, data: parse(i.data, {}), unit_ids: parse(i.unit_ids, []), pages: parse(i.pages, []) }));
   const states = {};
@@ -38,14 +64,14 @@ export function buildPack() {
   // Abbildungen nur, wenn sie auf Karten vorkommen oder lernrelevant sind
   const usedFigs = new Set();
   for (const i of items) { if (i.data.fig) usedFigs.add(i.data.fig); for (const f of i.data.figs || []) usedFigs.add(f); }
-  const figures = q('SELECT id, doc_id, topic_id, page, file, caption, title, description, labels, kind, relevant, status FROM figures')
-    .filter((f) => usedFigs.has(f.id) || f.relevant)
-    .map((f) => {
-      let img = '';
-      try { img = fs.readFileSync(path.join(FIG_DIR, String(f.doc_id), f.file)).toString('base64'); } catch {}
-      const { file, ...rest } = f;
-      return { ...rest, labels: parse(f.labels, []), img };
-    }).filter((f) => f.img);
+  const figures = [];
+  for (const f of q('SELECT id, doc_id, topic_id, page, file, caption, title, description, labels, kind, relevant, status FROM figures')
+    .filter((x) => usedFigs.has(x.id) || x.relevant)) {
+    const img = await phoneImage(f);
+    if (!img) continue;
+    const { file, ...rest } = f;
+    figures.push({ ...rest, labels: parse(f.labels, []), img: img.data, mime: img.mime });
+  }
   let weak = [];
   try { weak = findWeakSpots({ limit: 6 }); } catch {}
   return {
@@ -109,16 +135,19 @@ function signature() {
     one('SELECT COUNT(*) n, MAX(id) a FROM documents').a, one("SELECT group_concat(id || title || IFNULL(folder_id,'')) s FROM documents").s].join('|');
 }
 
-export function writePack(force = false) {
+let lastWrite = 0;
+export async function writePack(force = false) {
   const dir = icloudDir();
   if (!dir) return { ok: false, reason: 'icloud' };
   const sig = signature();
   if (!force && sig === lastSig && fs.existsSync(path.join(dir, DATA_NAME))) return { ok: true, unchanged: true };
+  // höchstens alle 10 Minuten neu schreiben (iCloud muss die Datei jedes Mal hochladen)
+  if (!force && lastSig && Date.now() - lastWrite < 10 * 60 * 1000) return { ok: true, later: true };
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.${DATA_NAME}.tmp`);
-  fs.writeFileSync(tmp, JSON.stringify(buildPack()));
+  fs.writeFileSync(tmp, JSON.stringify(await buildPack()));
   fs.renameSync(tmp, path.join(dir, DATA_NAME));
-  lastSig = sig;
+  lastSig = sig; lastWrite = Date.now();
   setSetting('mobileLastExport', { at: new Date().toISOString() });
   return { ok: true };
 }
@@ -154,7 +183,7 @@ export function startMobileSync() {
   if (timer) return;
   const tick = () => {
     try { scanImports(); } catch (e) { console.warn('[iPhone-Abgleich]', e.message); }
-    try { writePack(); } catch (e) { console.warn('[iPhone-Abgleich]', e.message); }
+    writePack().catch((e) => console.warn('[iPhone-Abgleich]', e.message));
   };
   setTimeout(tick, 8000);
   timer = setInterval(tick, 90 * 1000);
@@ -169,5 +198,5 @@ export function mobileStatus() {
     lastExport: getSetting('mobileLastExport', null), lastImport: getSetting('mobileLastImport', null),
   };
 }
-export const mobileSyncNow = () => { const imp = scanImports(); const exp = writePack(true); return { imported: imp, exported: exp }; };
+export const mobileSyncNow = async () => { const imp = scanImports(); const exp = await writePack(true); return { imported: imp, exported: exp }; };
 export const packId = () => crypto.randomUUID();

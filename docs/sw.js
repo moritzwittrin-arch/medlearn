@@ -3,7 +3,7 @@
  * offline aus den Daten, die der Mac über iCloud Drive bereitstellt (MedLearn-Daten.json).
  * Antworten werden lokal gespeichert und als „MedLearn-Fortschritt-….json“ zurück an den Mac gegeben. */
 'use strict';
-const VERSION = '1.6.1';
+const VERSION = '1.6.2';
 const CACHE = `medlearn-shell-${VERSION}`;
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png', 'vendor/fsrs.umd.js'];
 
@@ -338,7 +338,7 @@ async function handleApi(req, url, p) {
       case parts[0] === 'figures' && parts[2] === 'img': {
         const f = D.figs.get(Number(parts[1])); if (!f) return new Response('', { status: 404 });
         const bin = Uint8Array.from(atob(f.img), (c) => c.charCodeAt(0));
-        return new Response(bin, { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } });
+        return new Response(bin, { headers: { 'content-type': f.mime || 'image/png', 'cache-control': 'max-age=86400' } });
       }
       case parts[0] === 'figures' && parts.length === 2: { const f = D.figs.get(Number(parts[1])); return f ? json({ ...f, img: undefined }) : fail('Nicht gefunden', 404); }
       case p === 'profile' && m === 'GET': return json(D.profile || D.P.profile || { name: '', goal: 50 });
