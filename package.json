@@ -1,6 +1,6 @@
 {
   "name": "medlearn",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Persönliche Medizin-Lernapp (lokal)",
   "main": "server/index.js",
   "scripts": {
@@ -23,6 +23,6 @@
   "medlearn": {
     "updateRepo": "moritzwittrin-arch/medlearn",
     "updateBranch": "main",
-    "notes": "Quiz nur noch mit Single- und Multiple-Choice-Fragen (auch mit Bildern); bestehende Skripte werden im Hintergrund umgestellt"
+    "notes": "Fragen-Umstellung setzt nach erreichtem Nutzungslimit automatisch fort"
   }
 }

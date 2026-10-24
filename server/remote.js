@@ -25,7 +25,7 @@ const cookieOf = (req) => {
 const same = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 // Diese Funktionen gibt es nur am Mac selbst (Server beenden, Updates, KI-Einstellungen, Handy-Zugang verwalten)
-const LOCAL_ONLY = [/^\/api\/shutdown/, /^\/api\/update\//, /^\/api\/settings/, /^\/api\/remote/, /^\/api\/backups/, /^\/api\/mobile/];
+const LOCAL_ONLY = [/^\/api\/shutdown/, /^\/api\/update\//, /^\/api\/settings/, /^\/api\/remote/, /^\/api\/backups/, /^\/api\/mobile/, /^\/api\/quiz/];
 
 const page = (title, text) => `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MedLearn</title><style>body{font-family:-apple-system,system-ui,sans-serif;background:#0e3a3b;color:#e8f3f0;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center}

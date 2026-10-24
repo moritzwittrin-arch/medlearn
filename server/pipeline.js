@@ -325,26 +325,40 @@ export async function generateQuiz(topic) {
   return added;
 }
 
-// Bestehende Skripte im Hintergrund auf das neue Quiz umstellen (einmalig, wird nach Neustart fortgesetzt)
+// Bestehende Skripte im Hintergrund auf das neue Quiz umstellen (wird nach Neustart fortgesetzt).
+// Ist das Claude-Nutzungslimit erreicht, pausiert die Umstellung und versucht es alle 30 Minuten erneut.
 let quizUpgrading = false;
+let quizRetry = null;
+const quizCounts = () => one(`SELECT COUNT(*) total, SUM(CASE WHEN t.quiz_status='fertig' THEN 1 ELSE 0 END) done
+  FROM topics t JOIN documents d ON d.id=t.doc_id WHERE t.gen_status='fertig' AND d.status='fertig'`);
 export async function upgradeQuiz() {
   if (quizUpgrading || aiSettings().provider === 'offline') return;
   quizUpgrading = true;
+  clearTimeout(quizRetry); quizRetry = null;
   try {
     const topics = q(`SELECT t.*, c.title chapter FROM topics t JOIN chapters c ON c.id=t.chapter_id JOIN documents d ON d.id=t.doc_id
       WHERE t.gen_status='fertig' AND t.quiz_status IS NULL AND d.status='fertig' ORDER BY d.id, t.page_from`);
     if (!topics.length) { setSetting('quizUpgrade', null); return; }
-    const total = one("SELECT COUNT(*) n FROM topics t JOIN documents d ON d.id=t.doc_id WHERE t.gen_status='fertig' AND d.status='fertig'").n;
-    let done = total - topics.length;
-    setSetting('quizUpgrade', { done, total });
+    const status = (extra = {}) => { const c = quizCounts(); setSetting('quizUpgrade', { done: c.done || 0, total: c.total, ...extra }); };
+    status();
     console.log(`  Quizfragen werden für ${topics.length} Themen ergänzt (Hintergrund) …`);
-    await Promise.all(topics.map(async (t) => {
-      if (running.has(t.doc_id)) return;
-      try { await generateQuiz(t); run("UPDATE topics SET quiz_status='fertig' WHERE id=?", t.id); }
-      catch (e) { console.warn('  Quiz', t.title, e.message); }
-      done++; setSetting('quizUpgrade', { done, total });
-    }));
-    if (!one("SELECT COUNT(*) n FROM topics WHERE quiz_status IS NULL AND gen_status='fertig'").n) setSetting('quizUpgrade', null);
+    let failed = 0, stop = false;
+    // in kleinen Gruppen, damit bei erreichtem Limit nicht alle restlichen Themen sofort fehlschlagen
+    for (let i = 0; i < topics.length && !stop; i += 4) {
+      await Promise.all(topics.slice(i, i + 4).map(async (t) => {
+        if (running.has(t.doc_id) || stop) return;
+        try { await generateQuiz(t); run("UPDATE topics SET quiz_status='fertig' WHERE id=?", t.id); failed = 0; }
+        catch (e) { console.warn('  Quiz', t.title, e.message); if (++failed >= 4) stop = true; }
+      }));
+      status();
+    }
+    const c = quizCounts();
+    if ((c.done || 0) < c.total) {
+      const next = new Date(Date.now() + 30 * 60 * 1000);
+      status({ paused: true, next: next.toISOString() });
+      console.log(`  Quiz-Umstellung pausiert (vermutlich Nutzungslimit) – nächster Versuch ${next.toLocaleTimeString('de-AT')}`);
+      quizRetry = setTimeout(() => upgradeQuiz().catch(() => {}), 30 * 60 * 1000);
+    } else setSetting('quizUpgrade', null);
   } finally { quizUpgrading = false; }
 }
 

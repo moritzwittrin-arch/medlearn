@@ -459,6 +459,9 @@ app.post('/api/mobile/import', jsonUpload.single('file'), wrap((req) => {
   return importProgress(data);
 }));
 
+// Quiz-Umstellung sofort fortsetzen (z. B. wenn das Nutzungslimit wieder frei ist)
+app.post('/api/quiz/resume', wrap(() => { upgradeQuiz().catch((e) => console.warn(e.message)); return { ok: true }; }));
+
 // ---------- Profil (Name für die Begrüßung, Tagesziel) ----------
 app.get('/api/profile', wrap(() => getSetting('profile', { name: '', goal: 50 })));
 app.post('/api/profile', wrap((req) => {

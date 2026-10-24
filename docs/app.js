@@ -255,7 +255,9 @@ async function viewDashboard(soft = false) {
   const totalNew = d.fresh.cards + d.fresh.mc + d.fresh.match;
   const hasContent = d.subjects.length > 0;
   setView(`
-  ${banner}${d.quizUpgrade && d.quizUpgrade.done < d.quizUpgrade.total ? `<div class="card sync-banner small-b"><span><b>Deine Fragen werden auf Single &amp; Multiple Choice umgestellt</b> – ${d.quizUpgrade.done} von ${d.quizUpgrade.total} Themen fertig. Läuft im Hintergrund weiter, auch nach einem Neustart.</span></div>` : ''}${heroCard(d)}
+  ${banner}${d.quizUpgrade && d.quizUpgrade.done < d.quizUpgrade.total ? `<div class="card sync-banner small-b"><span><b>Fragen-Umstellung auf Single &amp; Multiple Choice:</b> ${d.quizUpgrade.done} von ${d.quizUpgrade.total} Themen fertig.
+    ${d.quizUpgrade.paused ? `Pausiert – vermutlich ist dein Claude-Nutzungslimit erreicht. Nächster automatischer Versuch um ${new Date(d.quizUpgrade.next).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}.` : 'Läuft im Hintergrund.'}</span>
+    ${d.quizUpgrade.paused && !window.IS_MOBILE && window.IS_LOCAL !== false ? '<button class="small" id="quizResume">Jetzt fortsetzen</button>' : ''}</div>` : ''}${heroCard(d)}
   ${d.processing.map((p) => `
     <div class="card" style="margin-bottom:16px">
       <div class="row between"><b class="row" style="gap:8px">${icon('file')} ${esc(p.title)}</b>
@@ -297,6 +299,8 @@ async function viewDashboard(soft = false) {
       </div>
   </div>`}`, soft);
   $app.querySelectorAll('[data-resume]').forEach((b) => b.onclick = async () => { await api(`/documents/${b.dataset.resume}/resume`, { method: 'POST' }); route(); });
+  const qr = document.getElementById('quizResume');
+  if (qr) qr.onclick = async () => { qr.disabled = true; await api('/quiz/resume', { method: 'POST' }).catch(() => {}); toast('Umstellung läuft wieder'); setTimeout(() => viewDashboard(true), 2500); };
   bindWeak();
   bindExamForms();
   if (d.processing.some((p) => p.status !== 'fehler')) {
